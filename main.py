@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QApplication, QWidget, \
     QGraphicsOpacityEffect, QVBoxLayout, QLabel, QPushButton, QStyleOption, QStyle, QFileDialog, QGridLayout, \
     QScrollArea, QMainWindow, QHBoxLayout, QCheckBox, QRadioButton
-from PyQt5.QtCore import Qt, QSize, QUrl, QFile, QElapsedTimer, QTimer
+from PyQt5.QtCore import Qt, QSize, QUrl, QFile, QElapsedTimer, QTimer, QThread, QObject
 from PyQt5.QtGui import QLinearGradient, QColor, QBrush, QPalette, QPainter, QPainterPath, QPixmap, QIcon, QCursor, \
     QPen, QFont, QFontMetrics, QImage
 from PyQt5.Qt import QSizePolicy, QCamera, QCameraViewfinder, QVideoEncoderSettings, QMediaRecorder, QMultimedia, \
@@ -10,7 +10,6 @@ from PyQt5.QtSvg import QSvgWidget, QSvgRenderer
 from utils.utils import check_streams
 import math
 import cv2 as cv
-import threading
 
 
 # class LogoWidget(QWidget):
@@ -100,6 +99,28 @@ class ResponsiveIconButton(QPushButton):
         self.setIconSize(QSize(e_point, e_point))
 
 
+class Video(QObject):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+
+    def show_feed(self, pixmap):
+        print('feed')
+        recorder = cv.VideoCapture(0)
+        #out = cv.VideoWriter('test_record.mp4', cv.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30,
+        #                     (int(self.recorder.get(3)), int(self.recorder.get(4))))
+        while True:
+            ret, frame = recorder.read()
+            if ret:
+                frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+                height, width, channel = frame.shape
+                step = channel * width
+                img = QImage(frame.data, width, height, step, QImage.Format_RGB888)
+                pixmap.setPixmap(QPixmap.fromImage(img))
+                #out.write(frame)
+        recorder.release()
+        #out.release()
+        cv.destroyAllWindows()
+
 class VideoRecordWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -112,7 +133,8 @@ class VideoRecordWidget(QWidget):
         self.area_layout = QGridLayout()
         self.camera = cv.VideoCapture(0)
         self.camera_info = None
-        self.viewfinder = QCameraViewfinder()
+        #self.viewfinder = QCameraViewfinder()
+        self.viewfinder = QLabel(parent=self.area)
         self.record_state = False
         self.record_toggle_button = QPushButton(parent=self.area)
         self.record_toggle_button.setVisible(False)
@@ -172,10 +194,13 @@ class VideoRecordWidget(QWidget):
         self.record_toggle_button.clicked.connect(self.stop_record)
         # self.recorder.record()
         self.record_state = True
-        self.recorder = cv.VideoCapture(0)
-        thread = threading.Thread(target=self.capture_video)
-        thread.daemon = True
-        thread.start()
+        self.thread = QThread()
+        test = Video()
+        test.moveToThread(self.thread)
+        #thread.started.connect(self.capture_video)
+        self.thread.started.connect(test.show_feed(self.viewfinder))
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.start()
         self.record_timer.start()
         self.record_repeater.start(1000)
 
@@ -191,10 +216,17 @@ class VideoRecordWidget(QWidget):
         # self.recorder.stop()
 
     def capture_video(self):
+        print('capture')
+        self.recorder = cv.VideoCapture(0)
         out = cv.VideoWriter('test_record.mp4', cv.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30, (int(self.recorder.get(3)), int(self.recorder.get(4))))
         while self.record_state:
             ret, frame = self.recorder.read()
             if ret:
+                frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+                height, width, channel = frame.shape
+                step = channel * width
+                img = QImage(frame.data, width, height, step, QImage.Format_RGB888)
+                self.viewfinder.setPixmap(QPixmap.fromImage(img))
                 out.write(frame)
         self.recorder.release()
         out.release()
