@@ -11,26 +11,48 @@ import wave
 
 
 class AudioProcess(QObject):
-    # finished = pyqtSignal()
+    finished = pyqtSignal()
+
     def __init__(self):
         super().__init__()
-        self.mic = QAudioRecorder()
-        settings = QAudioEncoderSettings()
-        settings.setQuality(QMultimedia.VeryHighQuality)
-        settings.setSampleRate(16000)
-        settings.setChannelCount(1)
-        settings.setEncodingMode(QMultimedia.ConstantBitRateEncoding)
-        self.mic.setEncodingSettings(settings)
-        self.mic_state = True
+        self.mic = pyaudio.PyAudio()
+        self.mic_state = False
+
+    def record(self):
+        chunk = 1024  # Record in chunks of 1024 samples
+        sample_format = pyaudio.paInt16  # 16 bits per sample
+        channels = 1
+        rate = 16000
+        filename = "record_audio.wav"
+        stream = self.mic.open(
+            format=sample_format,
+            channels=channels,
+            rate=rate,
+            frames_per_buffer=chunk,
+            input=True
+        )
+        frames = []
+        while self.mic_state:
+            data = stream.read(chunk)
+            frames.append(data)
+        stream.stop_stream()
+        stream.close()
+        self.mic.terminate()
+        wf = wave.open(filename, 'wb')
+        wf.setnchannels(channels)
+        wf.setsampwidth(self.mic.get_sample_size(sample_format))
+        wf.setframerate(rate)
+        wf.writeframes(b''.join(frames))
+        wf.close()
+        self.finished.emit()
 
     def toggle_record(self):
         print('toggle_record_audio')
         if self.mic_state:
-            self.mic.setOutputLocation(QUrl.fromLocalFile('test_record_audio.mp4'))
-            self.mic.record()
             self.mic_state = False
         else:
-            self.mic.stop()
+            self.mic_state = True
+
 
 class VideoProcess(QObject):
     finished = pyqtSignal()
@@ -48,10 +70,10 @@ class VideoProcess(QObject):
             ret, frame = self.cam.read()
             if ret:
                 frame = cv.flip(frame, 1)
-                frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
-                height, width, channel = frame.shape
+                frame_process = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+                height, width, channel = frame_process.shape
                 step = channel * width
-                img = QImage(frame.data, width, height, step, QImage.Format_RGB888)
+                img = QImage(frame_process.data, width, height, step, QImage.Format_RGB888)
                 self.progress.emit(img)
                 if self.recorder_state:
                     self.recorder.write(frame)
@@ -60,14 +82,16 @@ class VideoProcess(QObject):
         self.finished.emit()
 
     def toggle_record(self):
-        print('toggle_record')
+        print('toggle_record_video')
         if self.recorder is None:
-            self.recorder = cv.VideoWriter('test_record.mp4', cv.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30, (int(self.cam.get(3)), int(self.cam.get(4))))
+            self.recorder = cv.VideoWriter('record_video.mp4', cv.VideoWriter_fourcc('m', 'p', '4', 'v'), 30,
+                                           (int(self.cam.get(3)), int(self.cam.get(4))))
             self.recorder_state = True
         else:
             self.recorder.release()
             self.recorder = None
             self.recorder_state = False
+
 
 class App(QWidget):
     def __init__(self):
@@ -79,35 +103,39 @@ class App(QWidget):
         self.button = QPushButton('Toggle', self)
         self.button.setGeometry(400, 800, 200, 100)
         # Step 2: Create a QThread object
-        # self.thread = QThread()
-        # # Step 3: Create a worker object
-        # self.worker = VideoProcess()
-        # # Step 4: Move worker to the thread
-        # self.worker.moveToThread(self.thread)
-        # # Step 5: Connect signals and slots
-        # self.thread.started.connect(self.worker.run)
-        # self.worker.finished.connect(self.thread.quit)
-        # self.worker.finished.connect(self.worker.deleteLater)
-        # self.thread.finished.connect(self.thread.deleteLater)
-        # self.worker.progress.connect(self.update_pixmap)
-        # self.thread_audio = QThread()
+        self.thread = QThread()
+        # Step 3: Create a worker object
+        self.worker = VideoProcess()
+        # Step 4: Move worker to the thread
+        self.worker.moveToThread(self.thread)
+        # Step 5: Connect signals and slots
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.worker.progress.connect(self.update_pixmap)
+        self.thread_audio = QThread()
         self.worker_audio = AudioProcess()
-        # self.worker_audio.moveToThread(self.thread_audio)
-        # self.thread_audio.finished.connect(self.worker_audio.deleteLater)
-        # self.thread_audio.finished.connect(self.thread_audio.deleteLater)
+        self.worker_audio.moveToThread(self.thread_audio)
+        self.thread_audio.started.connect(self.worker_audio.record)
+        self.thread_audio.finished.connect(self.worker_audio.deleteLater)
+        self.thread_audio.finished.connect(self.thread_audio.deleteLater)
+        self.button.clicked.connect(self.toggle_record)
         self.button.clicked.connect(self.toggle_record_audio)
 
         # Step 6: Start the thread
-        # self.thread.start()
+        self.thread.start()
 
     def toggle_record_audio(self):
         self.worker_audio.toggle_record()
+        self.thread_audio.start()
 
     def toggle_record(self):
         self.worker.toggle_record()
 
     def update_pixmap(self, img):
         self.pixmap.setPixmap(QPixmap.fromImage(img))
+
 
 # @pyqtSlot(np.ndarray)
 #     def update_image(self, cv_img):

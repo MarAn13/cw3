@@ -1,7 +1,9 @@
+import time
+
 from PyQt5.QtWidgets import QApplication, QWidget, \
     QGraphicsOpacityEffect, QVBoxLayout, QLabel, QPushButton, QStyleOption, QStyle, QFileDialog, QGridLayout, \
     QScrollArea, QMainWindow, QHBoxLayout, QCheckBox, QRadioButton
-from PyQt5.QtCore import Qt, QSize, QUrl, QFile, QElapsedTimer, QTimer, QThread, QObject
+from PyQt5.QtCore import Qt, QSize, QUrl, QFile, QElapsedTimer, QTimer, QThread, QObject, pyqtSignal
 from PyQt5.QtGui import QLinearGradient, QColor, QBrush, QPalette, QPainter, QPainterPath, QPixmap, QIcon, QCursor, \
     QPen, QFont, QFontMetrics, QImage
 from PyQt5.Qt import QSizePolicy, QCamera, QCameraViewfinder, QVideoEncoderSettings, QMediaRecorder, QMultimedia, \
@@ -10,6 +12,8 @@ from PyQt5.QtSvg import QSvgWidget, QSvgRenderer
 from utils.utils import check_streams
 import math
 import cv2 as cv
+import pyaudio
+import wave
 
 
 # class LogoWidget(QWidget):
@@ -99,27 +103,99 @@ class ResponsiveIconButton(QPushButton):
         self.setIconSize(QSize(e_point, e_point))
 
 
-class Video(QObject):
+class AudioProcess(QObject):
+    finished = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
+        self.mic = None
+        self.mic_state = False
 
-    def show_feed(self, pixmap):
-        print('feed')
-        recorder = cv.VideoCapture(0)
-        #out = cv.VideoWriter('test_record.mp4', cv.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30,
-        #                     (int(self.recorder.get(3)), int(self.recorder.get(4))))
-        while True:
-            ret, frame = recorder.read()
+    def record(self):
+        self.mic = pyaudio.PyAudio()
+        chunk = 1024  # Record in chunks of 1024 samples
+        sample_format = pyaudio.paInt16  # 16 bits per sample
+        channels = 1
+        rate = 16000
+        filename = "record_audio.wav"
+        stream = self.mic.open(
+            format=sample_format,
+            channels=channels,
+            rate=rate,
+            frames_per_buffer=chunk,
+            input=True
+        )
+        frames = []
+        while self.mic_state:
+            data = stream.read(chunk)
+            frames.append(data)
+        stream.stop_stream()
+        stream.close()
+        self.mic.terminate()
+        wf = wave.open(filename, 'wb')
+        wf.setnchannels(channels)
+        wf.setsampwidth(self.mic.get_sample_size(sample_format))
+        wf.setframerate(rate)
+        wf.writeframes(b''.join(frames))
+        wf.close()
+        self.finished.emit()
+
+    def toggle_record(self):
+        print('toggle_record_audio')
+        if self.mic_state:
+            self.mic_state = False
+        else:
+            self.mic_state = True
+
+    def destroy(self):
+        print('destroy_audio')
+        self.mic_state = False
+
+
+class VideoProcess(QObject):
+    finished = pyqtSignal()
+    progress = pyqtSignal(QImage)
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.cam = cv.VideoCapture(0)
+        self.cam_state = True
+        self.recorder = None
+        self.recorder_state = False
+
+    def run(self):
+        while self.cam_state:
+            ret, frame = self.cam.read()
             if ret:
-                frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
-                height, width, channel = frame.shape
+                frame = cv.flip(frame, 1)
+                frame_process = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+                height, width, channel = frame_process.shape
                 step = channel * width
-                img = QImage(frame.data, width, height, step, QImage.Format_RGB888)
-                pixmap.setPixmap(QPixmap.fromImage(img))
-                #out.write(frame)
-        recorder.release()
-        #out.release()
+                img = QImage(frame_process.data, width, height, step, QImage.Format_RGB888)
+                self.progress.emit(img)
+                if self.recorder_state:
+                    self.recorder.write(frame)
+        if self.recorder_state:
+            self.recorder.release()
+        self.cam.release()
         cv.destroyAllWindows()
+        self.finished.emit()
+
+    def toggle_record(self):
+        print('toggle_record_video')
+        if self.recorder is None:
+            self.recorder = cv.VideoWriter('record_video.mp4', cv.VideoWriter_fourcc('m', 'p', '4', 'v'), 30,
+                                           (int(self.cam.get(3)), int(self.cam.get(4))))
+            self.recorder_state = True
+        else:
+            self.recorder.release()
+            self.recorder = None
+            self.recorder_state = False
+
+    def destroy(self):
+        print('destroy_video')
+        self.cam_state = False
+
 
 class VideoRecordWidget(QWidget):
     def __init__(self, parent=None):
@@ -131,23 +207,29 @@ class VideoRecordWidget(QWidget):
         self.area = QWidget(parent=self)
         self.area.setObjectName('area')
         self.area_layout = QGridLayout()
-        self.camera = cv.VideoCapture(0)
-        self.camera_info = None
-        #self.viewfinder = QCameraViewfinder()
         self.viewfinder = QLabel(parent=self.area)
-        self.record_state = False
         self.record_toggle_button = QPushButton(parent=self.area)
         self.record_toggle_button.setVisible(False)
         self.record_timer = QElapsedTimer()
-        self.record_repeater = QTimer()
+        self.record_repeater = QTimer(parent=self)
         self.record_repeater.timeout.connect(self.update_time)
         self.record_timer_text = QLabel(parent=self.area)
         self.record_timer_text.setVisible(False)
+        self.worker_video = None
+        self.worker_audio = None
+        self.thread_video = None
+        self.thread_audio = None
         self.render_default()
 
     def render_default(self):
         clear_layout(self.area_layout)
-        availability = QCameraInfo.availableCameras()
+        cam = cv.VideoCapture(0, cv.CAP_DSHOW)
+        if cam.isOpened():
+            availability = True
+        else:
+            availability = False
+        cam.release()
+        cv.destroyAllWindows()
         text = QLabel(parent=self.area)
         if not availability:
             text.setText('Sorry this mode is not supported because you dont have a camera available to record')
@@ -160,7 +242,6 @@ class VideoRecordWidget(QWidget):
             record_button.connect(self.render_record)
             self.area_layout.addWidget(record_button, 0, 0, alignment=Qt.AlignCenter)
             self.area_layout.addWidget(text, 1, 0, alignment=Qt.AlignCenter)
-            self.camera_info = availability
         self.area.setLayout(self.area_layout)
 
     def render_record(self):
@@ -174,6 +255,16 @@ class VideoRecordWidget(QWidget):
         self.area_layout.addWidget(self.record_timer_text, 0, 0, 0, 1, Qt.AlignCenter)
         self.area_layout.addWidget(self.viewfinder, 0, 1, 0, 2, Qt.AlignCenter)
         self.area_layout.addWidget(self.record_toggle_button, 0, 4, 0, 1, Qt.AlignCenter)
+        if self.worker_video is None:
+            self.worker_video = VideoProcess(parent=self.thread_video)
+            self.thread_video = QThread(parent=self)
+            self.worker_video.moveToThread(self.thread_video)
+            self.thread_video.started.connect(self.worker_video.run)
+            self.worker_video.progress.connect(self.update_pixmap)
+            self.worker_video.finished.connect(self.thread_video.quit)
+            self.worker_video.finished.connect(self.worker_video.deleteLater)
+            self.thread_video.finished.connect(self.thread_video.deleteLater)
+        self.thread_video.start()
         # self.camera = QCamera(self.camera_info[0])
         # self.camera.setViewfinder(self.viewfinder)
         # self.recorder = QMediaRecorder(self.camera)
@@ -192,18 +283,21 @@ class VideoRecordWidget(QWidget):
         self.record_toggle_button.setText('Stop')
         self.record_toggle_button.disconnect()
         self.record_toggle_button.clicked.connect(self.stop_record)
-        # self.recorder.record()
-        self.record_state = True
-        self.thread = QThread()
-        test = Video()
-        test.moveToThread(self.thread)
-        #thread.started.connect(self.capture_video)
-        self.thread.started.connect(test.show_feed(self.viewfinder))
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.thread.start()
+
+        if self.worker_audio is None:
+            self.worker_audio = AudioProcess(parent=self.thread_audio)
+            self.thread_audio = QThread(parent=self)
+            self.worker_audio.moveToThread(self.thread_audio)
+            self.thread_audio.started.connect(self.worker_audio.record)
+            self.worker_audio.finished.connect(self.thread_audio.quit)
+            self.worker_audio.finished.connect(self.worker_audio.deleteLater)
+            self.thread_audio.finished.connect(self.thread_audio.deleteLater)
+
+        self.toggle_record_video()
+        self.toggle_record_audio()
+        self.record_toggle_button.setEnabled(False)
         self.record_timer.start()
         self.record_repeater.start(1000)
-
 
     def stop_record(self):
         print('stop_record')
@@ -212,27 +306,22 @@ class VideoRecordWidget(QWidget):
         self.record_toggle_button.clicked.connect(self.start_record)
         self.record_timer.restart()
         self.record_repeater.stop()
-        self.record_state = False
-        # self.recorder.stop()
+        self.toggle_record_video()
+        self.toggle_record_audio()
 
-    def capture_video(self):
-        print('capture')
-        self.recorder = cv.VideoCapture(0)
-        out = cv.VideoWriter('test_record.mp4', cv.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30, (int(self.recorder.get(3)), int(self.recorder.get(4))))
-        while self.record_state:
-            ret, frame = self.recorder.read()
-            if ret:
-                frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
-                height, width, channel = frame.shape
-                step = channel * width
-                img = QImage(frame.data, width, height, step, QImage.Format_RGB888)
-                self.viewfinder.setPixmap(QPixmap.fromImage(img))
-                out.write(frame)
-        self.recorder.release()
-        out.release()
-        cv.destroyAllWindows()
+    def toggle_record_audio(self):
+        self.worker_audio.toggle_record()
+        self.thread_audio.start()
+
+    def toggle_record_video(self):
+        self.worker_video.toggle_record()
+
+    def update_pixmap(self, img):
+        self.viewfinder.setPixmap(QPixmap.fromImage(img))
 
     def update_time(self):
+        if not self.record_toggle_button.isEnabled():
+            self.record_toggle_button.setEnabled(True)
         secs = int(self.record_timer.elapsed() / 1000)
         mins = int(secs / 60)
         secs -= mins * 60
@@ -240,6 +329,16 @@ class VideoRecordWidget(QWidget):
         mins -= hours * 60
         hours, mins, secs = ['0' + i if len(i) == 1 else i for i in [str(hours), str(mins), str(secs)]]
         self.record_timer_text.setText(f'{hours}:{mins}:{secs}')
+
+    def destroy(self):
+        if self.worker_video:
+            self.worker_video.destroy()
+            # self.worker_video.deleteLater()
+        if self.thread_video:
+            self.thread_video.exit()
+        if self.worker_audio:
+            self.worker_audio.destroy()
+            self.worker_audio.deleteLater()
 
     def resizeEvent(self, e):
         self.area.setFixedSize(self.width(), self.height())
@@ -625,19 +724,23 @@ class MainWindow(QMainWindow):
         self.screen = QWidget(parent=self)
         self.screen.setObjectName('screen')
         self.screen.setGeometry(160, 0, 1280, 1024)
+        self.screen_file_upload = None
+        self.screen_record_video = None
         self.render_file_upload()
 
     def render_file_upload(self):
         clear_widget(self.screen)
-        screen_file_area = FileUploadWidget(parent=self.screen)
-        screen_file_area.setGeometry(128, 256, 1024, 512)
-        screen_file_area.show()
+        self.screen_file_upload = FileUploadWidget(parent=self.screen)
+        self.screen_file_upload.setGeometry(128, 256, 1024, 512)
+        self.screen_file_upload.show()
 
     def render_video_record(self):
+        if self.screen_record_video:
+            self.screen_record_video.destroy()
         clear_widget(self.screen)
-        screen_file_area = VideoRecordWidget(parent=self.screen)
-        screen_file_area.setGeometry(128, 256, 1024, 512)
-        screen_file_area.show()
+        self.screen_record_video = VideoRecordWidget(parent=self.screen)
+        self.screen_record_video.setGeometry(128, 256, 1024, 512)
+        self.screen_record_video.show()
 
 
 def main():
