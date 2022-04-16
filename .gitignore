@@ -140,4 +140,6 @@ cython_debug/
 
 # user defined
 other/
+*.mp4
+*.wav
 
