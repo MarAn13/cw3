@@ -1,42 +1,47 @@
-import pyaudio
-import wave
+from PyQt5.Qt import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 
-chunk = 1024  # Record in chunks of 1024 samples
-sample_format = pyaudio.paInt16  # 16 bits per sample
-channels = 2
-fs = 44100  # Record at 44100 samples per second
-seconds = 3
-filename = "output.wav"
 
-p = pyaudio.PyAudio()  # Create an interface to PortAudio
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet(
+            'QLabel{background-color: grey;}'
 
-print('Recording')
+        )
+        self.video_widget = QVideoWidget()
+        self.media_player = QMediaPlayer(self, QMediaPlayer.VideoSurface)
+        self.button = QPushButton('Play')
+        self.button.clicked.connect(self.play)
+        self.slider = QSlider(Qt.Horizontal)
+        self.media_player.setVideoOutput(self.video_widget)
+        self.area = QLabel(self)
+        self.area_layout = QGridLayout()
+        self.control_layout = QHBoxLayout()
+        # self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile('record.mp4')))
+        # self.video_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # self.button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+        # self.slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        # self.control_layout.addWidget(self.button)
+        # self.control_layout.addWidget(self.slider)
+        self.area_layout.addWidget(self.video_widget, 0, 0, 1, 4)
+        self.area_layout.addWidget(self.button, 1, 0)
+        self.area_layout.addWidget(self.slider, 1, 1)
+        # self.area_layout.addLayout(self.control_layout, 1, 0)
+        self.area.setLayout(self.area_layout)
 
-stream = p.open(format=sample_format,
-                channels=channels,
-                rate=fs,
-                frames_per_buffer=chunk,
-                input=True)
+    def play(self):
+        print(self.media_player.state(), self.media_player.mediaStatus(), self.media_player.error())
+        self.media_player.play()
 
-frames = []  # Initialize array to store frames
+    def resizeEvent(self, e):
+        self.area.setGeometry(100, 100, self.width() / 2, self.height() / 2)
 
-# Store data in chunks for 3 seconds
-for i in range(0, int(fs / chunk * seconds)):
-    data = stream.read(chunk)
-    frames.append(data)
 
-# Stop and close the stream
-stream.stop_stream()
-stream.close()
-# Terminate the PortAudio interface
-p.terminate()
-
-print('Finished recording')
-
-# Save the recorded data as a WAV file
-wf = wave.open(filename, 'wb')
-wf.setnchannels(channels)
-wf.setsampwidth(p.get_sample_size(sample_format))
-wf.setframerate(fs)
-wf.writeframes(b''.join(frames))
-wf.close()
+app = QApplication([])
+window = MainWindow()
+window.setFixedSize(1200, 800)
+window.show()
+app.exec_()

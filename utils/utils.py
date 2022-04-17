@@ -187,6 +187,16 @@ def convert(filepath, overwrite):
     return output
 
 
+def merge(video, audio, output):
+    stream_video = ffmpeg.input(video)
+    stream_audio = ffmpeg.input(audio)
+    stream = ffmpeg.concat(stream_video, stream_audio, v=1, a=1)
+    stream = ffmpeg.output(stream,
+                           output,
+                           f=params['OUTPUT_FORMAT'])
+    ffmpeg.run(stream, overwrite_output=True, quiet=True)
+
+
 def main():
     parser = ArgumentParser()
     parser.add_argument('path', type=str, help='file absolute path')
