@@ -164,10 +164,14 @@ class MediaPlayerWidget(QWidget):
         self.setStyleSheet(
             '#area{background-color: #292929; border-radius: 15px}'
             'QLabel{color: #FFFFFF;}'
+            'QSlider::groove:horizontal{border-radius: 1px; height: 20px; margin: 20px;}'
+            'QSlider::handle{background: none;}'
+            'QSlider::handle::hover{background-color: transparent; border: 4px solid black; height: 22px; width: 22px; margin: -14px 0; border-radius: 14px; padding: -14px 0px;}'
         )
         self.area = QWidget(parent=self)
         self.area.setObjectName('area')
         self.area_layout = QGridLayout()
+        self.process_widget = ProcessWidget(file, False, parent=self.parent())
         self.media_player = QMediaPlayer(flags=QMediaPlayer.VideoSurface, parent=self)
         self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file)))
         self.media_player_widget = QVideoWidget(parent=self.area)
@@ -175,16 +179,22 @@ class MediaPlayerWidget(QWidget):
         self.control_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
         self.control_button.clicked.connect(self.toggle_play)
         self.media_slider = QSlider(Qt.Horizontal, parent=self.area)
+        self.media_elapsed_time = QLabel('Elapsed', parent=self.area)
+        self.media_remained_time = QLabel('Remained', parent=self.area)
         self.media_player.setVideoOutput(self.media_player_widget)
         self.media_player.stateChanged.connect(self.media_player_state_changed)
         self.media_player.positionChanged.connect(self.media_player_position_changed)
         self.media_player.durationChanged.connect(self.media_player_duration_changed)
-        self.area_layout.addWidget(self.media_player_widget, 0, 0, 1, 4)
-        self.area_layout.addWidget(self.control_button, 1, 0)
-        self.area_layout.addWidget(self.media_slider, 1, 1)
+        self.media_elapsed_time.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.media_remained_time.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.media_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
+        self.control_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.area_layout.addWidget(self.media_player_widget, 0, 0, 8, 10)
+        self.area_layout.addWidget(self.media_elapsed_time, 8, 0, 1, 1)
+        self.area_layout.addWidget(self.media_slider, 8, 1, 1, 8)
+        self.area_layout.addWidget(self.media_remained_time, 8, 9)
+        self.area_layout.addWidget(self.control_button, 9, 0, 1, 1)
         self.area.setLayout(self.area_layout)
-        self.process_widget = ProcessWidget(file, False, parent=self.parent())
-        self.process_widget.show()
 
     def toggle_play(self):
         if self.media_player.state() == QMediaPlayer.PlayingState:
@@ -207,6 +217,10 @@ class MediaPlayerWidget(QWidget):
     def resizeEvent(self, e):
         self.area.setFixedSize(self.width(), self.height())
 
+    def showEvent(self, e):
+        self.show()
+        self.process_widget.show()
+
 
 class VideoProcess(QObject):
     finished = pyqtSignal()
@@ -215,13 +229,12 @@ class VideoProcess(QObject):
     def __init__(self, output):
         super().__init__()
         self.cam = cv.VideoCapture(0)
-        self.cam_state = True
         self.recorder = None
         self.recorder_state = False
         self.output = output
 
     def run(self):
-        while self.cam_state:
+        while self.cam:
             ret, frame = self.cam.read()
             if ret:
                 frame = cv.flip(frame, 1)
@@ -254,7 +267,6 @@ class VideoProcess(QObject):
 
     def destroy(self):
         print('destroy_video')
-        self.cam_state = False
         self.cam.release()
         cv.destroyAllWindows()
 
