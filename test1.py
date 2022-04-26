@@ -4,58 +4,103 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
 
+class CustomAudioSvgWidget(QPushButton):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.filepath = 'assets/audio_record_diamond.svg'
+        self.aspect_ratio = (1, 1)
+        self.max_background_offset = 0
+        self.background_offset = self.max_background_offset
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+
+    def set_background_offset(self, offset):
+        if offset < 0:
+            offset = 0
+        elif offset > self.max_background_offset:
+            offset = self.max_background_offset
+        self.background_offset = offset
+
+    def get_background_offset(self):
+        return self.background_offset
+
+    def get_max_background_offset(self):
+        return self.max_background_offset
+
+    def paintEvent(self, e):
+        painter = QPainter()
+        painter.begin(self)
+        painter.setPen(QColor('transparent'))
+        e_point = 0
+        if self.width() < self.height():
+            e_point = self.width()
+        else:
+            e_point = self.height()
+        self.max_background_offset = e_point * 0.15
+        # bound rect
+        painter.setBrush(QColor('blue'))
+        painter.drawRect(self.width() / 2 - e_point / 2, self.height() / 2 - e_point / 2, e_point, e_point)
+        grad = QLinearGradient()
+        grad.setColorAt(0, QColor('#DA70D6'))
+        grad.setColorAt(1, QColor('#7F00FF'))
+        grad.setStart(self.width() / 2, self.height() / 2 - e_point / 4)
+        grad.setFinalStop(self.width() / 2, self.height() / 2 + e_point / 4)
+        painter.setBrush(grad)
+        # offset_x, offset_y, w, h
+        painter.setRenderHint(QPainter.HighQualityAntialiasing)
+        painter.drawEllipse(self.width() / 2 - (e_point - self.background_offset) / 2,
+                            self.height() / 2 - (e_point - self.background_offset) / 2,
+                            e_point - self.background_offset, e_point - self.background_offset)
+        svg = QSvgRenderer(self.filepath)
+        # offset_x, offset_y, w, h
+        svg.render(painter,
+                   QRectF(self.width() / 2 - e_point / 2, self.height() / 2 - e_point / 2, e_point, e_point))
+        painter.end()
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setStyleSheet(
-            'QLabel{background-color: grey;}'
-            '#test1, #test2{background-color: red;}'
-            'QSlider{margin: 0px;}'
-            'QSlider::groove:horizontal{border-radius: 5px; height: 18px; margin: 20px 0px 20px 0px; background-color: yellow;}'
-            'QSlider::handle:horizontal{border: none; height: 20px; width: 20px; margin: -14px 0; border-radius: 5px; background-color: blue;}'
-            'QSlider::sub-page:horizontal{border-radius: 5px; margin: 20px 0px 20px 0px; background: purple;}'
-            )
-        self.video_widget = QVideoWidget()
-        self.media_player = QMediaPlayer(self, QMediaPlayer.VideoSurface)
-        self.button = QPushButton('Play')
-        self.button.clicked.connect(self.play)
-        self.slider = QSlider(Qt.Horizontal)
-        self.media_player.setVideoOutput(self.video_widget)
-        self.area = QLabel(self)
+            '#area{background: grey;}'
+        )
+        self.area = QWidget(parent=self)
+        self.area.setObjectName('area')
         self.area_layout = QGridLayout()
-        self.control_layout = QHBoxLayout()
-        # self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile('record.mp4')))
+        self.widget = CustomAudioSvgWidget(parent=self)
+        self.widget.clicked.connect(self.test)
+        self.widget.setCursor(QCursor(Qt.PointingHandCursor))
+        self.widget_inc = -1
+        self.area_layout.addWidget(self.widget)
+        self.area.setLayout(self.area_layout)
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_circle)
+        self.timer.start(10)
         # self.video_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         # self.button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
         # self.slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         # self.control_layout.addWidget(self.button)
         # self.control_layout.addWidget(self.slider)
-        self.media_elapsed_time = QLabel('Elapsed', self.area)
-        self.media_elapsed_time.setObjectName('test1')
-        self.media_remained_time = QLabel('Remained', self.area)
-        self.media_remained_time.setObjectName('test2')
-        self.media_elapsed_time.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        self.media_remained_time.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        self.slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        self.area_layout.addWidget(self.video_widget, 0, 0, 8, 10)
-        self.area_layout.addWidget(self.media_elapsed_time, 8, 0, 1, 1)
-        self.area_layout.addWidget(self.slider, 8, 1, 1, 8)
-        self.area_layout.addWidget(self.media_remained_time, 8, 9)
-        self.area_layout.addWidget(self.button, 9, 0, 1, 1)
-        # self.area_layout.addLayout(self.control_layout, 1, 0)
-        self.area.setLayout(self.area_layout)
 
-    def play(self):
-        print(self.media_player.state(), self.media_player.mediaStatus(), self.media_player.error())
-        self.media_player.play()
+    def test(self):
+        print('yeap')
+
+    def update_circle(self):
+        current_offset = self.widget.get_background_offset()
+        max_offset = self.widget.get_max_background_offset()
+        if current_offset == 0:
+            self.widget_inc = max_offset / 100
+        elif current_offset == max_offset:
+            self.widget_inc = -max_offset / 100
+        self.widget.set_background_offset(current_offset + self.widget_inc)
+        self.widget.update()
 
     def resizeEvent(self, e):
-        self.area.setGeometry(100, 100, self.width() / 2, self.height() / 2)
+        self.area.setFixedSize(self.width(), self.height())
 
 
 app = QApplication([])
 window = MainWindow()
-window.setFixedSize(1200, 800)
+# window.setFixedSize(1200, 800)
+window.setFixedSize(2000, 2000)
 window.show()
 app.exec_()

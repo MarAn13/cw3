@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QApplication, QWidget, \
     QGraphicsOpacityEffect, QVBoxLayout, QLabel, QPushButton, QStyleOption, QStyle, QFileDialog, QGridLayout, \
-    QScrollArea, QMainWindow, QHBoxLayout, QCheckBox, QRadioButton, QSpacerItem
-from PyQt5.QtCore import Qt, QSize, QUrl, QFile, QElapsedTimer, QTimer, QThread, QObject, pyqtSignal
+    QScrollArea, QMainWindow, QHBoxLayout, QCheckBox, QRadioButton, QSpacerItem, QStackedWidget
+from PyQt5.QtCore import Qt, QSize, QUrl, QFile, QElapsedTimer, QTimer, QThread, QObject, pyqtSignal, QRectF
 from PyQt5.QtGui import QLinearGradient, QColor, QBrush, QPalette, QPainter, QPainterPath, QPixmap, QIcon, QCursor, \
     QPen, QFont, QFontMetrics, QImage
 from PyQt5.Qt import QSizePolicy, QCamera, QCameraViewfinder, QVideoEncoderSettings, QMediaRecorder, QMultimedia, \
@@ -44,14 +44,12 @@ def clear_layout(layout, delete=False):
             temp.setVisible(False)
 
 
-class QSvgWidgetAspect(QSvgWidget):
+class SvgWidgetAspect(QSvgWidget):
     def __init__(self, filepath, aspect_ratio, clickable=False, parent=None):
         super().__init__(parent=parent)
         self.aspect_ratio = aspect_ratio
         self.clickable = clickable
         self.click_event = None
-        if self.clickable:
-            self.setCursor(QCursor(Qt.PointingHandCursor))
         self.load(filepath)
 
     def resizeEvent(self, e):
@@ -63,6 +61,9 @@ class QSvgWidgetAspect(QSvgWidget):
             e_point = e_height / self.aspect_ratio[1]
         self.setFixedSize(e_point * self.aspect_ratio[0], e_point * self.aspect_ratio[1])
 
+    def setClickable(self, state):
+        self.clickable = state
+
     def connect(self, func):
         if self.clickable:
             self.click_event = func
@@ -70,6 +71,59 @@ class QSvgWidgetAspect(QSvgWidget):
     def mousePressEvent(self, e):
         if self.clickable and self.click_event:
             self.click_event()
+
+
+class CustomAudioSvgWidget(SvgWidgetAspect):
+    filepath = 'assets/audio_record_diamond.svg'
+    aspect_ratio = (1, 1)
+
+    def __init__(self, parent=None):
+        super().__init__(self.filepath, self.aspect_ratio, True, parent)
+        self.max_background_offset = 0
+        self.background_offset = self.max_background_offset
+
+    def set_background_offset(self, offset):
+        if offset < 0:
+            offset = 0
+        elif offset > self.max_background_offset:
+            offset = self.max_background_offset
+        self.background_offset = offset
+
+    def get_background_offset(self):
+        return self.background_offset
+
+    def get_max_background_offset(self):
+        return self.max_background_offset
+
+    def paintEvent(self, e):
+        painter = QPainter()
+        painter.begin(self)
+        painter.setPen(QColor('transparent'))
+        e_point = 0
+        if self.width() < self.height():
+            e_point = self.width()
+        else:
+            e_point = self.height()
+        self.max_background_offset = e_point * 0.15
+        # bound rect
+        # painter.setBrush(QColor('blue'))
+        # painter.drawRect(self.width() / 2 - e_point / 2, self.height() / 2 - e_point / 2, e_point, e_point)
+        grad = QLinearGradient()
+        grad.setColorAt(0, QColor('#DA70D6'))
+        grad.setColorAt(1, QColor('#7F00FF'))
+        grad.setStart(self.width() / 2, self.height() / 2 - e_point / 4)
+        grad.setFinalStop(self.width() / 2, self.height() / 2 + e_point / 4)
+        painter.setBrush(grad)
+        # offset_x, offset_y, w, h
+        painter.setRenderHint(QPainter.HighQualityAntialiasing)
+        painter.drawEllipse(self.width() / 2 - (e_point - self.background_offset) / 2,
+                            self.height() / 2 - (e_point - self.background_offset) / 2,
+                            e_point - self.background_offset, e_point - self.background_offset)
+        svg = QSvgRenderer(self.filepath)
+        # offset_x, offset_y, w, h
+        svg.render(painter,
+                   QRectF(self.width() / 2 - e_point / 2, self.height() / 2 - e_point / 2, e_point, e_point))
+        painter.end()
 
 
 class ResponsiveIconButton(QPushButton):
@@ -121,12 +175,11 @@ class AudioProcess(QObject):
         stream.stop_stream()
         stream.close()
         self.mic.terminate()
-        wf = wave.open(self.output, 'wb')
-        wf.setnchannels(channels)
-        wf.setsampwidth(self.mic.get_sample_size(sample_format))
-        wf.setframerate(rate)
-        wf.writeframes(b''.join(frames))
-        wf.close()
+        with wave.open(self.output, 'wb') as wf:
+            wf.setnchannels(channels)
+            wf.setsampwidth(self.mic.get_sample_size(sample_format))
+            wf.setframerate(rate)
+            wf.writeframes(b''.join(frames))
         self.finished.emit()
 
     def toggle_record(self):
@@ -192,9 +245,9 @@ class MediaPlayerWidget(QWidget):
             '#media_seek::handle:horizontal{border: 3px solid black; height: 20px; width: 20px; margin: -14px 0; border-radius: 5px; background-color: green;}'
             '#media_seek::sub-page:horizontal{border-radius: 5px; margin: 20px 0px 20px 0px; background-color: green;}'
             '#media_volume{margin: 0px;}'
-            '#media_volume::groove:vertical{width: 18px; background-color: silver;}'
+            '#media_volume::groove:vertical{width: 18px; background: qlineargradient(x1:0.5, y1:0, x2:0.5, y2:0.25, x3:0.5, y3:1 stop:0 red, stop:0.25 yellow, stop:1 green);}'
             '#media_volume::handle:vertical{height: 10px; background: black}'
-            '#media_volume::add-page:vertical{background: qlineargradient(x1:0.5, y1:0, x2:0.5, y2:0.25, x3:0.5, y3:1 stop:0 red, stop:0.25 yellow, stop:1 green);}'
+            '#media_volume::sub-page:vertical{background: silver;}'
         )
         self.setFocus()
         self.setFocusPolicy(Qt.StrongFocus)
@@ -209,25 +262,27 @@ class MediaPlayerWidget(QWidget):
         self.control_button_play = QPushButton(parent=self.area)
         self.control_button_play.setFocusPolicy(Qt.NoFocus)
         self.control_button_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+        self.control_button_play.setCursor(QCursor(Qt.PointingHandCursor))
         self.control_button_play.clicked.connect(self.toggle_play)
         self.control_button_stop = QPushButton(parent=self.area)
         self.control_button_stop.setFocusPolicy(Qt.NoFocus)
         self.control_button_stop.setIcon(self.style().standardIcon(QStyle.SP_MediaStop))
+        self.control_button_stop.setCursor(QCursor(Qt.PointingHandCursor))
         self.control_button_stop.clicked.connect(self.stop)
         self.control_button_mute = QPushButton(parent=self.area)
         self.control_button_mute.setFocusPolicy(Qt.NoFocus)
         self.control_button_mute.setIcon(self.style().standardIcon(QStyle.SP_MediaVolume))
+        self.control_button_mute.setCursor(QCursor(Qt.PointingHandCursor))
         self.control_button_mute.clicked.connect(self.toggle_volume)
         self.media_slider = MediaSlider(Qt.Horizontal, parent=self.area)
         self.media_slider.setObjectName('media_seek')
         self.media_slider.setFocusPolicy(Qt.NoFocus)
+        self.media_slider.setCursor(QCursor(Qt.PointingHandCursor))
         self.media_slider.valueChanged.connect(self.media_slider_value_changed)
         self.media_volume = MediaSlider(Qt.Vertical, parent=self.area)
         self.media_volume.setObjectName('media_volume')
-        # self.media_volume.setStyleSheet(
-        #     '#media_volume[cssClass~=muted]::add-page:vertical{opacity: 100}'
-        # )
         self.media_volume.setFocusPolicy(Qt.NoFocus)
+        self.media_volume.setCursor(QCursor(Qt.PointingHandCursor))
         self.media_volume.setRange(0, 100)
         self.media_volume.setValue(self.media_player.volume())
         self.media_volume.valueChanged.connect(self.media_volume_value_changed)
@@ -269,14 +324,10 @@ class MediaPlayerWidget(QWidget):
             temp = QGraphicsOpacityEffect()
             temp.setOpacity(0.25)
             self.media_volume.setGraphicsEffect(temp)
-            # self.media_volume.setProperty('cssClass', 'muted')
-            # self.media_volume.setStyleSheet(self.media_volume.styleSheet())
         else:
             self.media_player.setMuted(False)
             self.control_button_mute.setIcon(self.style().standardIcon(QStyle.SP_MediaVolume))
             self.media_volume.setGraphicsEffect(None)
-            # self.media_volume.setProperty('cssClass', '')
-            # self.media_volume.setStyleSheet(self.media_volume.styleSheet())
 
     def stop(self):
         self.media_player.stop()
@@ -326,7 +377,7 @@ class MediaPlayerWidget(QWidget):
             return
         if seek_inc is not None:
             val = self.media_slider.value() + seek_inc * 1000
-            if self.media_slider.minimum() <= val  <= self.media_slider.maximum():
+            if self.media_slider.minimum() <= val <= self.media_slider.maximum():
                 self.media_slider.setValue(self.media_slider.value() + seek_inc * 1000)
             else:
                 if val < self.media_slider.minimum():
@@ -358,12 +409,13 @@ class VideoProcess(QObject):
     def __init__(self, output):
         super().__init__()
         self.cam = cv.VideoCapture(0)
+        self.cam_state = True
         self.recorder = None
         self.recorder_state = False
         self.output = output
 
     def run(self):
-        while self.cam:
+        while self.cam_state:
             ret, frame = self.cam.read()
             if ret:
                 frame = cv.flip(frame, 1)
@@ -374,11 +426,10 @@ class VideoProcess(QObject):
                 self.progress.emit(img)
                 if self.recorder_state:
                     self.recorder.write(frame)
-        if self.recorder_state:
-            self.recorder.release()
         self.cam.release()
-        cv.destroyAllWindows()
+        # cv.destroyAllWindows()
         self.finished.emit()
+        print('video thread done')
 
     def toggle_record(self):
         print('toggle_record_video')
@@ -390,69 +441,98 @@ class VideoProcess(QObject):
             self.recorder.release()
             self.recorder = None
             self.recorder_state = False
+            self.cam_state = False
 
     def get_output(self):
         return self.output
 
     def destroy(self):
         print('destroy_video')
+        self.cam_state = False
+        self.recorder_state = False
         self.cam.release()
         cv.destroyAllWindows()
 
 
-class VideoRecordWidget(QWidget):
-    def __init__(self, parent=None):
+class RecordWidget(QWidget):
+    def __init__(self, record_type, parent=None):
         super().__init__(parent=parent)
         self.setStyleSheet(
             '#area{background-color: #292929; border-radius: 15px}'
+            '#area[cssClass~=disabled]{background: none;}'
             'QLabel{color: #FFFFFF;}'
+            'QPushButton{background: transparent; border-color: none;}'
         )
+        self.record_type = record_type
         self.area = QWidget(parent=self)
         self.area.setObjectName('area')
         self.area_layout = QGridLayout()
         self.viewfinder = QLabel(parent=self.area)
-        self.record_toggle_button = QPushButton(parent=self.area)
-        self.record_toggle_button.setVisible(False)
+        self.record_toggle_button = None
         self.record_timer = QElapsedTimer()
         self.record_repeater = QTimer(parent=self)
         self.record_repeater.timeout.connect(self.update_time)
         self.record_timer_text = QLabel(parent=self.area)
+        self.record_timer_text.setText('00:00:00')
         self.record_timer_text.setVisible(False)
         self.worker_video = None
         self.worker_audio = None
         self.thread_video = None
         self.thread_audio = None
+        self.timer_audio = QTimer()
 
     def render_default(self):
         clear_layout(self.area_layout)
-        cam = cv.VideoCapture(0, cv.CAP_DSHOW)
-        if cam.isOpened():
-            availability = True
+        args = dict()
+        if self.record_type == 'video':
+            args['text'] = 'camera'
+            args['svg'] = 'assets/video_record_red.svg'
+            args['svg_aspect'] = (1, 1)
+            args['button'] = 'record_video'
+            args['button_connect'] = self.render_record_video
+            cam = cv.VideoCapture(0, cv.CAP_DSHOW)
+            if cam.isOpened():
+                availability = True
+            else:
+                availability = False
+            cam.release()
+            cv.destroyAllWindows()
         else:
-            availability = False
-        cam.release()
-        cv.destroyAllWindows()
+            args['text'] = 'microphone'
+            args['svg'] = 'assets/audio_record_linear.svg'
+            args['svg_aspect'] = (1, 1)
+            args['button'] = 'record_audio'
+            args['button_connect'] = self.render_record_audio
+            mic = pyaudio.PyAudio()
+            if mic.get_device_count() > 0:
+                availability = True
+            else:
+                availability = False
+            mic.terminate()
         text = QLabel(parent=self.area)
         if not availability:
-            text.setText('Sorry this mode is not supported because you dont have a camera available to record')
+            text.setText(f'Sorry this mode is not supported because you dont have a {args["text"]} available to record')
             self.area_layout.addWidget(text, 0, 0, alignment=Qt.AlignCenter)
             text.setWordWrap(True)
         else:
+            self.area.setProperty('cssClass', 'disabled')
+            self.area.setStyleSheet(self.styleSheet())
             text.setText('Click to start recording')
-            record_button = QSvgWidgetAspect('assets/video_record.svg', (16, 11), clickable=True, parent=self.area)
-            record_button.setObjectName('record')
-            record_button.connect(self.render_record)
-            self.area_layout.addWidget(record_button, 0, 0, alignment=Qt.AlignCenter)
-            self.area_layout.addWidget(text, 1, 0, alignment=Qt.AlignCenter)
+            record_button = SvgWidgetAspect(args['svg'], args['svg_aspect'], clickable=True, parent=self.area)
+            record_button.setObjectName(args['button'])
+            record_button.setCursor(QCursor(Qt.PointingHandCursor))
+            record_button.connect(args['button_connect'])
+            self.area_layout.addWidget(record_button, 0, 0, 1, 1, alignment=Qt.AlignCenter)
+            self.area_layout.addWidget(text, 1, 0, 1, 1, alignment=Qt.AlignCenter)
         self.area.setLayout(self.area_layout)
 
-    def render_record(self):
+    def render_record_video(self):
         clear_layout(self.area_layout, delete=True)
-        self.record_timer_text.setText('00:00:00')
         self.record_timer_text.setVisible(True)
-        self.record_toggle_button.setText('Record')
+        self.record_toggle_button = QPushButton(parent=self.area)
+        self.record_toggle_button.setIcon(QIcon(QPixmap('assets/video_record_red.svg')))
         self.record_toggle_button.clicked.connect(self.start_record)
-        self.record_toggle_button.setVisible(True)
+        self.record_toggle_button.setCursor(QCursor(Qt.PointingHandCursor))
         self.record_toggle_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.area_layout.addWidget(self.record_timer_text, 0, 0, 0, 1, Qt.AlignCenter)
         self.area_layout.addWidget(self.viewfinder, 0, 1, 0, 2, Qt.AlignCenter)
@@ -464,61 +544,110 @@ class VideoRecordWidget(QWidget):
             self.worker_video.moveToThread(self.thread_video)
             self.thread_video.started.connect(self.worker_video.run)
             self.worker_video.progress.connect(self.update_pixmap)
-            self.worker_video.finished.connect(self.thread_video.quit)
-            self.worker_video.finished.connect(self.worker_video.deleteLater)
+            self.worker_video.finished.connect(self.thread_video.quit)  # is not working properly
         self.thread_video.start()
+
+    def render_record_audio(self):
+        clear_layout(self.area_layout, delete=True)
+        self.record_timer_text.setVisible(True)
+        self.record_toggle_button = CustomAudioSvgWidget(parent=self.area)
+        self.record_toggle_button.setCursor(QCursor(Qt.PointingHandCursor))
+        # self.record_toggle_button.setStyleSheet('background: qlineargradient(x1:0.5, y1:0, x2:0.5, y2:1 stop:0 #DA70D6, stop:1 #7F00FF); border-radius: 100%;')
+        # self.record_toggle_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.area_layout.addWidget(self.record_toggle_button, 0, 0, 1, 1, Qt.AlignCenter)
+        self.area_layout.addWidget(self.record_timer_text, 1, 0, 1, 1, Qt.AlignCenter)
+        self.area.setLayout(self.area_layout)
+        self.timer_audio.timeout.connect(self.update_svg_circle)
+        self.timer_audio.start(10)
+        self.start_record()
 
     def start_record(self):
         print('start_record')
-        self.record_toggle_button.setText('Stop')
-        self.record_toggle_button.disconnect()
-        self.record_toggle_button.clicked.connect(self.stop_record)
-
+        if self.record_type == 'video':
+            self.record_toggle_button.setIcon(self.style().standardIcon(QStyle.SP_MediaStop))
+            self.record_toggle_button.disconnect()
+        else:
+            self.record_toggle_button.connect(None)
+        if self.record_type == 'video':
+            self.record_toggle_button.clicked.connect(self.stop_record)
+        else:
+            self.record_toggle_button.connect(self.stop_record)
         if self.worker_audio is None:
             self.worker_audio = AudioProcess('record_audio.wav')
             self.thread_audio = self.parent().parent().create_thread()
             self.worker_audio.moveToThread(self.thread_audio)
             self.thread_audio.started.connect(self.worker_audio.record)
-            self.worker_audio.finished.connect(self.thread_audio.quit)
-            self.worker_audio.finished.connect(self.worker_audio.deleteLater)
-
-        self.toggle_record_video()
+            self.worker_audio.finished.connect(self.thread_audio.quit)  # is not working properly
+            self.worker_audio.finished.connect(self.worker_audio.deleteLater)  # is not working properly
+        if self.record_type == 'video':
+            self.toggle_record_video()
         self.toggle_record_audio()
-        self.record_toggle_button.setEnabled(False)
+        if self.record_type == 'video':
+            self.record_toggle_button.setEnabled(False)
+        else:
+            self.record_toggle_button.setClickable(False)
         self.record_timer.start()
-        self.record_repeater.start(1000)
+        self.record_repeater.start(100)
 
     def stop_record(self):
         print('stop_record')
-        # self.record_toggle_button.setText('Record')
-        # self.record_toggle_button.disconnect()
-        # self.record_toggle_button.clicked.connect(self.start_record)
         self.record_timer.restart()
         self.record_repeater.stop()
-        self.toggle_record_video()
+        if self.record_type == 'audio':
+            self.timer_audio.stop()
+        if self.record_type == 'video':
+            self.toggle_record_video()
         self.toggle_record_audio()
-        video = self.worker_video.get_output()
+        if self.thread_video:
+            self.thread_video.quit()
+            self.thread_video.wait()
+        if self.thread_audio:
+            self.thread_audio.quit()
+            self.thread_audio.wait()
+        if self.record_type == 'video':
+            video = self.worker_video.get_output()
         audio = self.worker_audio.get_output()
         parent = self.parent()
+        self.record_toggle_button.setCursor(QCursor(Qt.ArrowCursor))
+        if self.record_type == 'video':
+            merge(video, audio, 'record.mp4')
+            output = 'record.mp4'
+        else:
+            output = 'record_audio.wav'
         clear_widget(self.parent())
-        merge(video, audio, 'record.mp4')
-        player = MediaPlayerWidget('record.mp4', parent=parent)
+        player = MediaPlayerWidget(output, parent=parent)
         player.setGeometry(128, 256, 1024, 512)
         player.show()
 
     def toggle_record_audio(self):
         self.worker_audio.toggle_record()
-        self.thread_audio.start()
+        if not self.thread_audio.isRunning():
+            print('start audio thread')
+            self.thread_audio.start()
 
     def toggle_record_video(self):
         self.worker_video.toggle_record()
+
+    def update_svg_circle(self):
+        current_offset = self.record_toggle_button.get_background_offset()
+        max_offset = self.record_toggle_button.get_max_background_offset()
+        if current_offset == 0:
+            self.svg_circle_inc = max_offset / 100
+        elif current_offset == max_offset:
+            self.svg_circle_inc = -max_offset / 100
+        self.record_toggle_button.set_background_offset(current_offset + self.svg_circle_inc)
+        self.record_toggle_button.update()
 
     def update_pixmap(self, img):
         self.viewfinder.setPixmap(QPixmap.fromImage(img))
 
     def update_time(self):
-        if not self.record_toggle_button.isEnabled():
-            self.record_toggle_button.setEnabled(True)
+        if self.record_type == 'video':
+            if not self.record_toggle_button.isEnabled():
+                self.record_toggle_button.setEnabled(True)
+        else:
+            if not self.record_toggle_button.clickable:
+                self.record_toggle_button.setClickable(True)
         time_str = ms_to_time(self.record_timer.elapsed())
         self.record_timer_text.setText(time_str)
 
@@ -527,6 +656,10 @@ class VideoRecordWidget(QWidget):
             self.worker_video.destroy()
         if self.worker_audio:
             self.worker_audio.destroy()
+        if self.thread_video:
+            self.thread_video.quit()
+        if self.thread_audio:
+            self.thread_audio.quit()
 
     def resizeEvent(self, e):
         self.area.setFixedSize(self.width(), self.height())
@@ -589,44 +722,60 @@ class ProcessWidget(QWidget):
         self.setGeometry(345, 820, 600, 150)
         self.area = QLabel(parent=self)
         self.area.setObjectName('area')
+        self.file_type = 'other'
         if not file_process:
+            if files.split('.')[-1] == 'mp4':
+                self.file_type = 'video'
+            else:
+                self.file_type = 'audio'
             self.record_area = QLabel(parent=self.area)
             self.record_area_layout = QVBoxLayout()
-            self.record_button = QSvgWidgetAspect('assets/video_record.svg', (16, 11), clickable=True,
-                                                  parent=self.record_area)
+            if self.file_type == 'video':
+                self.record_button = SvgWidgetAspect('assets/video_record_red.svg', (1, 1), clickable=True,
+                                                     parent=self.record_area)
+            else:
+                self.record_button = SvgWidgetAspect('assets/audio_record_linear.svg', (1, 1), clickable=True,
+                                                     parent=self.record_area)
+            self.record_button.setCursor(QCursor(Qt.PointingHandCursor))
             self.record_button.connect(self.render_record_widget)
             self.record_area_layout.addWidget(self.record_button)
             self.record_area.setLayout(self.record_area_layout)
-            self.total_areas = 3
+            if self.file_type == 'audio':
+                self.total_areas = 2
+                self.setGeometry(495, 820, 300, 150)
+            else:
+                self.total_areas = 3
         else:
             self.total_areas = 2
-        self.radio_area = QLabel(parent=self.area)
+        if not self.file_type == 'audio':
+            self.radio_area = QLabel(parent=self.area)
+            self.radio_area_layout = QVBoxLayout()
+            self.radio_button_preferred = QRadioButton('preferred', parent=self.radio_area)
+            self.radio_button_preferred.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.radio_button_preferred.setChecked(True)
+            self.radio_button_audio_only = QRadioButton('audio-only', parent=self.radio_area)
+            self.radio_button_audio_only.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.radio_button_video_only = QRadioButton('video-only', parent=self.radio_area)
+            self.radio_button_video_only.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.radio_button_audio_video = QRadioButton('audio-video', parent=self.radio_area)
+            self.radio_button_audio_video.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.radio_area_layout.addWidget(self.radio_button_preferred)
+            self.radio_area_layout.addWidget(self.radio_button_audio_only)
+            self.radio_area_layout.addWidget(self.radio_button_video_only)
+            self.radio_area_layout.addWidget(self.radio_button_audio_video)
+            self.radio_area.setLayout(self.radio_area_layout)
+            self.audio_only = []
+            self.video_only = []
+            self.audio_video = []
         self.button_area = QLabel(parent=self.area)
-        self.radio_area_layout = QVBoxLayout()
-        self.radio_button_preferred = QRadioButton('preferred', parent=self.radio_area)
-        self.radio_button_preferred.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.radio_button_preferred.setChecked(True)
-        self.radio_button_audio_only = QRadioButton('audio-only', parent=self.radio_area)
-        self.radio_button_audio_only.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.radio_button_video_only = QRadioButton('video-only', parent=self.radio_area)
-        self.radio_button_video_only.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.radio_button_audio_video = QRadioButton('audio-video', parent=self.radio_area)
-        self.radio_button_audio_video.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.radio_area_layout.addWidget(self.radio_button_preferred)
-        self.radio_area_layout.addWidget(self.radio_button_audio_only)
-        self.radio_area_layout.addWidget(self.radio_button_video_only)
-        self.radio_area_layout.addWidget(self.radio_button_audio_video)
-        self.radio_area.setLayout(self.radio_area_layout)
         self.button_area_layout = QVBoxLayout()
         self.process_button = QPushButton('Process', parent=self.button_area)
         self.process_button.setCursor(QCursor(Qt.PointingHandCursor))
         self.process_button.clicked.connect(self.process)
         self.button_area_layout.addWidget(self.process_button, alignment=Qt.AlignCenter)
         self.button_area.setLayout(self.button_area_layout)
-        self.audio_only = []
-        self.video_only = []
-        self.audio_video = []
-        self.check_files(files)
+        if not self.file_type == 'audio':
+            self.check_files(files)
 
     def check_files(self, files):
         self.audio_only = []
@@ -663,8 +812,11 @@ class ProcessWidget(QWidget):
     def render_record_widget(self):
         parent = self.parent()
         clear_widget(self.parent())
-        record_widget = VideoRecordWidget(parent=parent)
-        record_widget.render_record()
+        record_widget = RecordWidget(self.file_type, parent=parent)
+        if self.file_type == 'video':
+            record_widget.render_record_video()
+        else:
+            record_widget.render_default()
         record_widget.setGeometry(128, 256, 1024, 512)
         record_widget.show()
 
@@ -680,19 +832,25 @@ class ProcessWidget(QWidget):
             self.button_area.setGeometry(self.area.width() / self.total_areas * 2, 0,
                                          self.area.width() / self.total_areas, self.area.height())
         else:
-            self.radio_area.setGeometry(0, 0, self.area.width() / self.total_areas, self.area.height())
+            if not self.file_type == 'audio':
+                self.radio_area.setGeometry(0, 0, self.area.width() / self.total_areas, self.area.height())
+            else:
+                self.record_area.setGeometry(0, 0, self.area.width() / self.total_areas, self.area.height())
             self.button_area.setGeometry(self.area.width() / self.total_areas, 0, self.area.width() / self.total_areas,
                                          self.area.height())
         # self.process_button.setGeometry(79, 37, 150, 75)
-        min_font = self.radio_button_preferred.font()
-        for i in [self.radio_button_preferred, self.radio_button_audio_only, self.radio_button_video_only,
-                  self.radio_button_audio_video]:
-            font, step = resize_font(i)
-            if font.pointSize() < min_font.pointSize():
-                min_font = font
-        for i in [self.radio_button_preferred, self.radio_button_audio_only, self.radio_button_video_only,
-                  self.radio_button_audio_video]:
-            i.setFont(min_font)
+        if not self.file_type == 'audio':
+            min_font = self.radio_button_preferred.font()
+            for i in [self.radio_button_preferred, self.radio_button_audio_only, self.radio_button_video_only,
+                      self.radio_button_audio_video]:
+                font, step = resize_font(i)
+                if font.pointSize() < min_font.pointSize():
+                    min_font = font
+            for i in [self.radio_button_preferred, self.radio_button_audio_only, self.radio_button_video_only,
+                      self.radio_button_audio_video]:
+                i.setFont(min_font)
+        font, step = resize_font(self.process_button)
+        self.process_button.setFont(font)
 
 
 class FileIcon(QWidget):
@@ -767,7 +925,7 @@ class FileUploadWidget(QLabel):
         self.text = QLabel("Drag and Drop files here", parent=self)
         self.text.setAlignment(Qt.AlignCenter)
         # self.upload_icon = QSvgWidget('assets/file_upload_upload.svg', parent=self)
-        self.upload_icon = QSvgWidgetAspect('assets/file_upload_upload.svg', (176, 213), parent=self)
+        self.upload_icon = SvgWidgetAspect('assets/file_upload_upload.svg', (176, 213), parent=self)
 
         # self.upload_icon.setPixmap()
         # self.upload_icon.setAlignment(Qt.AlignCenter)
@@ -931,6 +1089,7 @@ class MainWindow(QMainWindow):
         audio_record_pixmap = QPixmap('assets/audio_record.svg')
         audio_record_icon = QIcon(audio_record_pixmap)
         self.audio_record.setIcon(audio_record_icon)
+        self.audio_record.clicked.connect(self.render_audio_record)
         self.settings = QPushButton(parent=self.menu)
         self.settings.setObjectName('settings')
         self.settings.setGeometry(62.98, 952.5, 35, 35)
@@ -965,10 +1124,18 @@ class MainWindow(QMainWindow):
     def render_video_record(self):
         clear_widget(self.screen)
         self.clear_thread()
-        screen_record_video = VideoRecordWidget(parent=self.screen)
+        screen_record_video = RecordWidget('video', parent=self.screen)
         screen_record_video.render_default()
         screen_record_video.setGeometry(128, 256, 1024, 512)
         screen_record_video.show()
+
+    def render_audio_record(self):
+        clear_widget(self.screen)
+        self.clear_thread()
+        screen_record_audio = RecordWidget('audio', parent=self.screen)
+        screen_record_audio.render_default()
+        screen_record_audio.setGeometry(128, 256, 1024, 512)
+        screen_record_audio.show()
 
     def closeEvent(self, e):
         clear_widget(self)
@@ -978,9 +1145,12 @@ def main():
     # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)  # enable high dpi scaling
     # QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)  # use high dpi icons
     app = QApplication([])
-    # window = MainWindow()
-    window = MediaPlayerWidget('test.mp4')
-    window.setFixedSize(1200, 800)
+    window = MainWindow()
+    # window = RecordWidget('audio')
+    # window = MediaPlayerWidget('record_audio.wav')
+    # window.render_default()
+    # window.render_record_audio()
+    # window.setFixedSize(1200, 800)
     window.show()
     app.exec_()
     print('Finished')
