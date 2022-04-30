@@ -5,7 +5,7 @@ from PyQt5.QtCore import Qt, QSize, QUrl, QFile, QElapsedTimer, QTimer, QThread,
 from PyQt5.QtGui import QLinearGradient, QColor, QBrush, QPalette, QPainter, QPainterPath, QPixmap, QIcon, QCursor, \
     QPen, QFont, QFontMetrics, QImage
 from PyQt5.Qt import QSizePolicy, QCamera, QCameraViewfinder, QVideoEncoderSettings, QMediaRecorder, QMultimedia, \
-    QCameraInfo, QMediaPlayer, QSlider, QVideoWidget, QMediaContent
+    QCameraInfo, QMediaPlayer, QSlider, QVideoWidget, QMediaContent, QStyle, QStyleOptionButton, QPropertyAnimation
 from PyQt5.QtSvg import QSvgWidget, QSvgRenderer
 from utils.utils import check_streams, merge
 import math
@@ -127,14 +127,44 @@ class CustomAudioSvgWidget(SvgWidgetAspect):
 
 
 class ResponsiveIconButton(QPushButton):
-    def __init__(self, img_path, color=None, parent=None):
+    def __init__(self, svg_path, parent=None):
         super().__init__(parent=parent)
-        self.pixmap = QPixmap(img_path)
-        if color:
-            mask = self.pixmap.createMaskFromColor(QColor('transparent'), Qt.MaskInColor)
-            self.pixmap.fill((QColor(color)))
-            self.pixmap.setMask(mask)
-        self.setIcon(QIcon(self.pixmap))
+        self.filepath = svg_path
+        self.border_color = 'transparent'
+        self.border_state = True
+        self.resize(self.width(), self.height())
+
+    def setBorderColor(self, color):
+        self.border_color = color
+
+    def setBorderState(self, state):
+        self.border_state = state
+        self.update()
+
+    def paintEvent(self, e):
+        option = QStyleOptionButton()
+        option.initFrom(self)
+        if option.state & QStyle.State_MouseOver:
+            brush_color = QColor('#323232')
+        else:
+            brush_color = QColor('#252525')
+        painter = QPainter()
+        painter.setRenderHint(QPainter.HighQualityAntialiasing)
+        painter.begin(self)
+        # self.width() / 6 = 14 for initial size where 6 is desired border width
+        pen = QPen(QColor(self.border_color), self.width() / 14, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(brush_color)
+        path = QPainterPath()
+        path.addRoundedRect(0, 0, self.width(), self.height(), 15, 15)
+        painter.fillPath(path, painter.brush())
+        if self.border_state:
+            painter.drawPath(path)
+        svg = QSvgRenderer(self.filepath)
+        # offset_x, offset_y, w, h
+        svg_size = QSize(self.width() / 2, self.height() / 2)
+        svg.render(painter, QRectF(self.width() / 2 - svg_size.width() / 2, self.height() / 2 - svg_size.height() / 2, svg_size.width(), svg_size.height()))
+        painter.end()
 
     def resizeEvent(self, e):
         e_width = e.size().width()
@@ -143,7 +173,7 @@ class ResponsiveIconButton(QPushButton):
             e_point = e_width
         else:
             e_point = e_height
-        self.setIconSize(QSize(e_point, e_point))
+        self.setFixedSize(e_point, e_point)
 
 
 class AudioProcess(QObject):
@@ -1064,38 +1094,45 @@ class MainWindow(QMainWindow):
         self.logo = SvgWidgetAspect('assets/logo.svg', (1, 1), parent=self.menu)
         # self.logo.setGeometry(38, 38, 84, 84)
         # self.logo.setPixmap(QPixmap('assets/logo.svg'))
-        self.file_upload = QPushButton(parent=self.menu)
-        self.file_upload.setObjectName('file_upload')
+        self.file_upload = ResponsiveIconButton('assets/file_upload.svg', parent=self.menu)
+        self.file_upload.setBorderColor('#3BACD9')
+        # self.file_upload.setObjectName('file_upload')
         # self.file_upload.setGeometry(38, 252, 84, 84)
         self.file_upload.setCursor(QCursor(Qt.PointingHandCursor))
-        self.file_upload.setIcon(QIcon(QPixmap('assets/file_upload.svg')))
+        # self.file_upload.setIcon(QIcon(QPixmap('assets/file_upload.svg')))
         self.file_upload.clicked.connect(self.render_file_upload)
         self.file_upload.clicked.connect(lambda: self.toggle_active(self.file_upload))
-        self.video_record = QPushButton(parent=self.menu)
-        self.video_record.setObjectName('video_record')
+        self.video_record = ResponsiveIconButton('assets/video_record.svg', parent=self.menu)
+        self.video_record.setBorderColor('#A7171A')
+        # self.video_record.setObjectName('video_record')
         # self.video_record.setGeometry(38, 427, 84, 84)
         self.video_record.setCursor(QCursor(Qt.PointingHandCursor))
-        self.video_record.setIcon(QIcon(QPixmap('assets/video_record.svg')))
+        # self.video_record.setIcon(QIcon(QPixmap('assets/video_record.svg')))
         self.video_record.clicked.connect(self.render_video_record)
         self.video_record.clicked.connect(lambda: self.toggle_active(self.video_record))
-        self.audio_record = QPushButton(parent=self.menu)
-        self.audio_record.setObjectName('audio_record')
+        self.audio_record = ResponsiveIconButton('assets/audio_record.svg', parent=self.menu)
+        self.audio_record.setBorderColor('#DA70D6')
+        # self.audio_record.setObjectName('audio_record')
         # self.audio_record.setGeometry(38, 602, 84, 84)
         self.audio_record.setCursor(QCursor(Qt.PointingHandCursor))
-        self.audio_record.setIcon(QIcon(QPixmap('assets/audio_record.svg')))
+        # self.audio_record.setIcon(QIcon(QPixmap('assets/audio_record.svg')))
         self.audio_record.clicked.connect(self.render_audio_record)
         self.audio_record.clicked.connect(lambda: self.toggle_active(self.audio_record))
-        self.settings = QPushButton(parent=self.menu)
+        self.settings = ResponsiveIconButton('assets/settings.svg', parent=self.menu)
         # self.settings.setObjectName('settings')
         # self.settings.setGeometry(62.98, 952.5, 35, 35)
         self.settings.setCursor(QCursor(Qt.PointingHandCursor))
-        self.settings.setIcon(QIcon(QPixmap('assets/settings.svg')))
+        # self.settings.setIcon(QIcon(QPixmap('assets/settings.svg')))
+        self.logo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.file_upload.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.video_record.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.audio_record.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.settings.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         menu_layout.addWidget(self.logo, 0, 0, 1, 1)
         menu_layout.addWidget(self.file_upload, 2, 0, 1, 1)
         menu_layout.addWidget(self.video_record, 3, 0, 1, 1)
         menu_layout.addWidget(self.audio_record, 4, 0, 1, 1)
         menu_layout.addWidget(self.settings, 5, 0, 1, 1)
-        menu_layout.setRowStretch(0, 100)
         self.menu.setLayout(menu_layout)
         self.screen = QWidget(parent=self)
         self.screen.setObjectName('screen')
@@ -1104,12 +1141,9 @@ class MainWindow(QMainWindow):
         self.render_file_upload()
 
     def toggle_active(self, widget):
-        if widget.property('cssClass') is None:
-            for i in [self.file_upload, self.video_record, self.audio_record]:
-                i.setProperty('cssClass', None)
-                i.setStyleSheet(i.styleSheet())
-            widget.setProperty('cssClass', 'active')
-            widget.setStyleSheet(widget.styleSheet())
+        for i in [self.file_upload, self.video_record, self.audio_record]:
+            i.setBorderState(True)
+        widget.setBorderState(False)
 
     def create_thread(self):
         self.threads.append(QThread())
@@ -1153,6 +1187,14 @@ def main():
     # QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)  # use high dpi icons
     app = QApplication([])
     window = MainWindow()
+    # window = QMainWindow()
+    # test = ResponsiveIconButton('assets/settings.svg')
+    # anim = QPropertyAnimation(test, b'geometry')
+    # anim.setDuration(10)
+    # anim.setStartValue(QRectF(0, 0, 100, 100))
+    # anim.setEndValue(QRectF(0, 0, 2000, 2000))
+    # anim.start()
+    # window.layout().addWidget(test)
     # window = RecordWidget('audio')
     # window = MediaPlayerWidget('record_audio.wav')
     # window.render_default()
