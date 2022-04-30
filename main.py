@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QApplication, QWidget, \
     QGraphicsOpacityEffect, QVBoxLayout, QLabel, QPushButton, QStyleOption, QStyle, QFileDialog, QGridLayout, \
-    QScrollArea, QMainWindow, QHBoxLayout, QCheckBox, QRadioButton, QSpacerItem, QStackedWidget
+    QScrollArea, QMainWindow, QHBoxLayout, QCheckBox, QRadioButton, QSpacerItem, QStackedWidget, QTextEdit
 from PyQt5.QtCore import Qt, QSize, QUrl, QFile, QElapsedTimer, QTimer, QThread, QObject, pyqtSignal, QRectF
 from PyQt5.QtGui import QLinearGradient, QColor, QBrush, QPalette, QPainter, QPainterPath, QPixmap, QIcon, QCursor, \
     QPen, QFont, QFontMetrics, QImage
@@ -163,7 +163,8 @@ class ResponsiveIconButton(QPushButton):
         svg = QSvgRenderer(self.filepath)
         # offset_x, offset_y, w, h
         svg_size = QSize(self.width() / 2, self.height() / 2)
-        svg.render(painter, QRectF(self.width() / 2 - svg_size.width() / 2, self.height() / 2 - svg_size.height() / 2, svg_size.width(), svg_size.height()))
+        svg.render(painter, QRectF(self.width() / 2 - svg_size.width() / 2, self.height() / 2 - svg_size.height() / 2,
+                                   svg_size.width(), svg_size.height()))
         painter.end()
 
     def resizeEvent(self, e):
@@ -261,6 +262,41 @@ class MediaSlider(QSlider):
             self.setValue(move_pos)
             self.timer.restart()
             self.timer.start()
+
+
+class ResultWidget(QWidget):
+    def __init__(self, files, parent=None):
+        super().__init__(parent=parent)
+        self.setStyleSheet(
+            '#area{background-color: #292929; border-radius: 15px}'
+            '#file_area, #result_area{background-color: #3A3A3A; border-radius: 15px;}'
+        )
+        self.area = QWidget(parent=self)
+        self.area.setObjectName('area')
+        self.area_layout = QGridLayout()
+        self.file_area = QWidget(parent=self.area)
+        self.file_area.setObjectName('file_area')
+        self.file_area_layout = QVBoxLayout()
+        file_area_text = QLabel('Files', parent=self.file_area)
+        self.file_area_layout.addWidget(file_area_text)
+        self.scroll = QScrollArea(parent=self.file_area)
+        self.scroll.setBackgroundRole(QPalette.Dark)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setWidget(self.file_area)
+        self.result_area = QTextEdit(parent=self.area)
+        self.result_area.setObjectName('result_area')
+        self.result_area.setReadOnly(True)
+        self.file_area.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.result_area.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.area_layout.addWidget(self.file_area, 0, 0, 1, 2)
+        self.area_layout.addWidget(self.result_area, 0, 3, 1, 5)
+        for i in range(self.area_layout.columnCount()):
+            self.area_layout.setColumnStretch(i, 1)
+        self.area.setLayout(self.area_layout)
+
+    def resizeEvent(self, e):
+        self.area.setFixedSize(self.width(), self.height())
 
 
 class MediaPlayerWidget(QWidget):
@@ -695,11 +731,15 @@ class RecordWidget(QWidget):
         self.area.setFixedSize(self.width(), self.height())
 
 
-def resize_font(widget):
+def resize_font(el, font=None, text=None):
     # font setting
-    font = widget.font()
+    if font is None:
+        font = el.font()
+        real_bound = el.contentsRect()
+        text = el.text()
+    else:
+        real_bound = el
     check = True
-    real_bound = widget.contentsRect()
     last_inc = {
         'val': font.pointSize() / 2,
         'dir': 'none'
@@ -711,8 +751,8 @@ def resize_font(widget):
         font_size = font.pointSize()
         test_font = QFont(font)
         test_font.setPointSize(font.pointSize() + 1)
-        test_bound = QFontMetrics(test_font).boundingRect(widget.text())
-        bound = QFontMetrics(font).boundingRect(widget.text())
+        test_bound = QFontMetrics(test_font).boundingRect(text)
+        bound = QFontMetrics(font).boundingRect(text)
         if bound.width() > real_bound.width() or bound.height() > real_bound.height():
             if last_inc['dir'] == 'up' or last_inc['dir'] == 'tilt':
                 font.setPointSize(font_size - last_inc['val'])
@@ -1186,7 +1226,8 @@ def main():
     # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)  # enable high dpi scaling
     # QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)  # use high dpi icons
     app = QApplication([])
-    window = MainWindow()
+    # window = MainWindow()
+    window = ResultWidget(['1'])
     # window = QMainWindow()
     # test = ResponsiveIconButton('assets/settings.svg')
     # anim = QPropertyAnimation(test, b'geometry')
@@ -1199,7 +1240,7 @@ def main():
     # window = MediaPlayerWidget('record_audio.wav')
     # window.render_default()
     # window.render_record_audio()
-    # window.setFixedSize(1200, 800)
+    window.setFixedSize(1200, 800)
     window.show()
     app.exec_()
     print('Finished')
