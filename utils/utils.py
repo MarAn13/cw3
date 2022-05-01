@@ -1,6 +1,7 @@
 import ffmpeg
 from argparse import ArgumentParser
 from pydub import AudioSegment
+import torch.tensor
 import os
 
 params = {
@@ -195,6 +196,15 @@ def merge(video, audio, output):
                            output,
                            f=params['OUTPUT_FORMAT'])
     ffmpeg.run(stream, overwrite_output=True, quiet=True)
+
+def compute_wer(pred_batch, target_batch):
+    pred_batch_len = torch.tensor(len(pred_batch), dtype=torch.int32)
+    target_batch_len = torch.tensor(len(target_batch), dtype=torch.int32)
+    wer = compute_wer(pred_batch,
+                      target_batch,
+                      pred_batch_len,
+                      target_batch_len,
+                      args['CHAR_TO_INDEX'][' '])
 
 
 def main():
