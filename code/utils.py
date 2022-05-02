@@ -3,6 +3,12 @@ from argparse import ArgumentParser
 from pydub import AudioSegment
 import torch.tensor
 import os
+import sys
+from ..other.deep_avsr.audio_only.util import predict as pred_audio_only
+from ..other.deep_avsr.video_only.util import predict as pred_video_only
+from ..other.deep_avsr.audio_visual.util import predict as pred_audio_video
+from ..other.deep_avsr.audio_visual.config import args
+from ..other.deep_avsr.audio_visual.utils.metrics import compute_wer as get_wer
 
 params = {
     'INPUT_FORMAT': 'mp4',
@@ -198,14 +204,34 @@ def merge(video, audio, output):
     ffmpeg.run(stream, overwrite_output=True, quiet=True)
 
 
-def compute_wer(pred_batch, target_batch):
-    pred_batch_len = torch.tensor(len(pred_batch), dtype=torch.int32)
-    target_batch_len = torch.tensor(len(target_batch), dtype=torch.int32)
-    wer = compute_wer(pred_batch,
-                      target_batch,
-                      pred_batch_len,
-                      target_batch_len,
-                      args['CHAR_TO_INDEX'][' '])
+def predict(files, mode):
+    if mode == 'audio-only':
+        pred = pred_audio_only(files)
+    elif mode == 'video-only':
+        pred = pred_video_only(files)
+    else:
+        pred = pred_audio_video(files)
+    return pred
+
+
+def compute_wer(data):
+    # data - dictionary {file: [original, pred]}
+    result = dict()
+    for file, [original, pred] in data.items():
+        original_batch = get_tensor_batch(original)
+        original_batch_len = torch.tensor(len(original_batch), dtype=torch.int32)
+        pred_batch = get_tensor_batch(pred)
+        pred_batch_len = torch.tensor(len(pred_batch), dtype=torch.int32)
+        wer = get_wer(pred_batch, original_batch, pred_batch_len, original_batch_len, args['CHAR_TO_INDEX'][' '])
+        result[file] = wer
+    return result
+
+
+def get_tensor_batch(data):
+    batch = [args['CHAR_TO_INDEX'][i] for i in data]
+    batch.append(args['CHAR_TO_INDEX']['<EOS>'])
+    batch = torch.tensor(data, dtype=torch.int32)
+    return batch
 
 
 def main():
@@ -219,4 +245,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    print(compute_wer({'test': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELLO MY FRIEND NICE TO MEET YOU'],
+                 'test1': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELYU MY FRIND NCE TO MEIT U'],
+                 'test2': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELLO FRIEND NECE TO MEET YOU']}))

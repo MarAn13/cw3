@@ -190,6 +190,8 @@ class RecordWidget(QWidget):
 
     def render_record_video(self):
         clear_layout(self.area_layout, delete=True)
+        self.area.setProperty('cssClass', None)
+        self.area.setStyleSheet(self.styleSheet())
         self.record_timer_text.setVisible(True)
         self.record_toggle_button = QPushButton(parent=self.area)
         self.record_toggle_button.setIcon(QIcon(QPixmap('../assets/video_record_red.svg')))

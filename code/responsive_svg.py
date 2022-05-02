@@ -107,13 +107,13 @@ class ResponsiveIconButton(QPushButton):
     def paintEvent(self, e):
         option = QStyleOptionButton()
         option.initFrom(self)
-        if option.state & QStyle.State_MouseOver:
+        if option.state & QStyle.State_MouseOver or not self.border_state:
             brush_color = QColor('#323232')
         else:
             brush_color = QColor('#252525')
         painter = QPainter()
-        painter.setRenderHint(QPainter.HighQualityAntialiasing)
         painter.begin(self)
+        painter.setRenderHint(QPainter.HighQualityAntialiasing)
         # self.width() / 6 = 14 for initial size where 6 is desired border width
         pen = QPen(QColor(self.border_color), self.width() / 14, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
         painter.setPen(pen)
