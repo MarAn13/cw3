@@ -1,3 +1,18 @@
+"""
+Processing media
+"""
+from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QRadioButton, QSlider, QGridLayout, QVBoxLayout, QStyle, \
+    QSizePolicy, QGraphicsOpacityEffect
+from PyQt5.Qt import Qt
+from PyQt5.QtCore import QElapsedTimer, QUrl
+from PyQt5.QtGui import QCursor
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
+from PyQt5.QtMultimediaWidgets import QVideoWidget
+from ui_utils import ms_to_time, resize_font, clear_widget
+from utils import check_streams
+from responsive_svg import SvgWidgetAspect
+
+
 class MediaSlider(QSlider):
     def __init__(self, orientation, parent=None):
         super().__init__(orientation, parent=parent)
@@ -32,6 +47,7 @@ class MediaSlider(QSlider):
             self.setValue(move_pos)
             self.timer.restart()
             self.timer.start()
+
 
 class MediaPlayerWidget(QWidget):
     def __init__(self, file, parent=None):
@@ -201,6 +217,7 @@ class MediaPlayerWidget(QWidget):
         self.show()
         self.process_widget.show()
 
+
 class ProcessWidget(QWidget):
     def __init__(self, files, file_process, parent=None):
         super().__init__(parent)
@@ -209,7 +226,7 @@ class ProcessWidget(QWidget):
             'QPushButton{color: #50C878;background-color: #303933;border: 1px solid #3E3E3E;border-radius: 15px;}'
             'QRadioButton{color: #FFFFFF; background-color: blue;}'
             'QRadioButton::indicator{width: 10px; height: 10px; background-color: #FFFFFF;}'
-            'QRadioButton::indicator::checked{image: url(assets/radio_button_indicator.svg);}'
+            'QRadioButton::indicator::checked{image: url(../assets/radio_button_indicator.svg);}'
             'QRadioButton[cssClass~=disabled]{color: grey; background-color: yellow;}'
             'QRadioButton::indicator[cssClass~=disabled]{background-color: grey;}'
         )
@@ -225,10 +242,10 @@ class ProcessWidget(QWidget):
             self.record_area = QLabel(parent=self.area)
             self.record_area_layout = QVBoxLayout()
             if self.file_type == 'video':
-                self.record_button = SvgWidgetAspect('assets/video_record_red.svg', (1, 1), clickable=True,
+                self.record_button = SvgWidgetAspect('../assets/video_record_red.svg', (1, 1), clickable=True,
                                                      parent=self.record_area)
             else:
-                self.record_button = SvgWidgetAspect('assets/audio_record_linear.svg', (1, 1), clickable=True,
+                self.record_button = SvgWidgetAspect('../assets/audio_record_linear.svg', (1, 1), clickable=True,
                                                      parent=self.record_area)
             self.record_button.setCursor(QCursor(Qt.PointingHandCursor))
             self.record_button.connect(self.render_record_widget)
@@ -304,15 +321,13 @@ class ProcessWidget(QWidget):
         self.setStyleSheet(self.styleSheet())
 
     def render_record_widget(self):
-        parent = self.parent()
+        parent = self.parent().parent()
         clear_widget(self.parent())
-        record_widget = RecordWidget(self.file_type, parent=parent)
+        record_widget = parent.render_record(self.file_type)
         if self.file_type == 'video':
             record_widget.render_record_video()
         else:
             record_widget.render_default()
-        record_widget.setGeometry(128, 256, 1024, 512)
-        record_widget.show()
 
     def process(self):
         print('process')

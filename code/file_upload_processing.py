@@ -1,3 +1,18 @@
+"""
+Processing file uploads
+"""
+from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QScrollArea, QGridLayout, QVBoxLayout, QFileDialog, \
+    QSizePolicy
+from PyQt5.Qt import Qt
+from PyQt5.QtGui import QPalette, QCursor
+from PyQt5.QtSvg import QSvgWidget
+import math
+from ui_utils import clear_layout, resize_font
+from responsive_svg import SvgWidgetAspect
+from media_processing import ProcessWidget
+from PyQt5.QtWidgets import QApplication
+
+
 class FileUploadWidget(QLabel):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -28,8 +43,8 @@ class FileUploadWidget(QLabel):
         self.layout = QGridLayout()
         self.text = QLabel("Drag and Drop files here", parent=self)
         self.text.setAlignment(Qt.AlignCenter)
-        # self.upload_icon = QSvgWidget('assets/file_upload_upload.svg', parent=self)
-        self.upload_icon = SvgWidgetAspect('assets/file_upload_upload.svg', (176, 213), parent=self)
+        # self.upload_icon = QSvgWidget('../assets/file_upload_upload.svg', parent=self)
+        self.upload_icon = SvgWidgetAspect('../assets/file_upload_upload.svg', (176, 213), parent=self)
 
         # self.upload_icon.setPixmap()
         # self.upload_icon.setAlignment(Qt.AlignCenter)
@@ -141,6 +156,7 @@ class FileUploadWidget(QLabel):
     def dragMoveEvent(self, e):
         print('drag_move')
 
+
 class FileIcon(QWidget):
     def __init__(self, text, file_type, parent=None):
         super().__init__(parent=parent)
@@ -151,9 +167,9 @@ class FileIcon(QWidget):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.aspect_ratio = (8, 10)
         if file_type == 'video':
-            self.icon = QSvgWidget('assets/video_file_icon.svg', parent=self)
+            self.icon = QSvgWidget('../assets/video_file_icon.svg', parent=self)
         else:
-            self.icon = QSvgWidget('assets/audio_file_icon.svg', parent=self)
+            self.icon = QSvgWidget('../assets/audio_file_icon.svg', parent=self)
         self.icon.setObjectName('icon')
         self.text = QLabel(parent=self)
         self.text.setText(text)
@@ -180,3 +196,10 @@ class FileIcon(QWidget):
         self.text.setFixedSize(real_width, real_height * 0.25)
         font, step = resize_font(self.text)
         self.text.setFont(font)
+
+#
+# app = QApplication([])
+# window = FileUploadWidget()
+# window.setFixedSize(1200, 800)
+# window.show()
+# app.exec_()

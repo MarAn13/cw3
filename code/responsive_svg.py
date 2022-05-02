@@ -1,3 +1,13 @@
+"""
+Classes with responsive icons
+"""
+from PyQt5.QtWidgets import QPushButton, QStyle, QStyleOptionButton
+from PyQt5.Qt import Qt
+from PyQt5.QtCore import QRectF, QSize
+from PyQt5.QtGui import QPainter, QPainterPath, QPen, QColor, QLinearGradient
+from PyQt5.QtSvg import QSvgWidget, QSvgRenderer
+
+
 class SvgWidgetAspect(QSvgWidget):
     def __init__(self, filepath, aspect_ratio, clickable=False, parent=None):
         super().__init__(parent=parent)
@@ -28,7 +38,7 @@ class SvgWidgetAspect(QSvgWidget):
 
 
 class CustomAudioSvgWidget(SvgWidgetAspect):
-    filepath = 'assets/audio_record_diamond.svg'
+    filepath = '../assets/audio_record_diamond.svg'
     aspect_ratio = (1, 1)
 
     def __init__(self, parent=None):
@@ -53,7 +63,6 @@ class CustomAudioSvgWidget(SvgWidgetAspect):
         painter = QPainter()
         painter.begin(self)
         painter.setPen(QColor('transparent'))
-        e_point = 0
         if self.width() < self.height():
             e_point = self.width()
         else:

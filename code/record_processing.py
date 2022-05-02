@@ -1,3 +1,18 @@
+"""
+Record processing
+"""
+from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QGridLayout, QSizePolicy, QStyle
+from PyQt5.Qt import Qt
+from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QElapsedTimer
+from PyQt5.QtGui import QImage, QCursor, QIcon, QPixmap
+from ui_utils import clear_widget, clear_layout, ms_to_time
+from utils import merge
+from responsive_svg import SvgWidgetAspect, CustomAudioSvgWidget
+import pyaudio
+import wave
+import cv2 as cv
+
+
 class AudioProcess(QObject):
     finished = pyqtSignal()
 
@@ -100,6 +115,7 @@ class VideoProcess(QObject):
         self.cam.release()
         cv.destroyAllWindows()
 
+
 class RecordWidget(QWidget):
     def __init__(self, record_type, parent=None):
         super().__init__(parent=parent)
@@ -132,7 +148,7 @@ class RecordWidget(QWidget):
         args = dict()
         if self.record_type == 'video':
             args['text'] = 'camera'
-            args['svg'] = 'assets/video_record_red.svg'
+            args['svg'] = '../assets/video_record_red.svg'
             args['svg_aspect'] = (1, 1)
             args['button'] = 'record_video'
             args['button_connect'] = self.render_record_video
@@ -145,7 +161,7 @@ class RecordWidget(QWidget):
             cv.destroyAllWindows()
         else:
             args['text'] = 'microphone'
-            args['svg'] = 'assets/audio_record_linear.svg'
+            args['svg'] = '../assets/audio_record_linear.svg'
             args['svg_aspect'] = (1, 1)
             args['button'] = 'record_audio'
             args['button_connect'] = self.render_record_audio
@@ -176,7 +192,7 @@ class RecordWidget(QWidget):
         clear_layout(self.area_layout, delete=True)
         self.record_timer_text.setVisible(True)
         self.record_toggle_button = QPushButton(parent=self.area)
-        self.record_toggle_button.setIcon(QIcon(QPixmap('assets/video_record_red.svg')))
+        self.record_toggle_button.setIcon(QIcon(QPixmap('../assets/video_record_red.svg')))
         self.record_toggle_button.clicked.connect(self.start_record)
         self.record_toggle_button.setCursor(QCursor(Qt.PointingHandCursor))
         self.record_toggle_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
@@ -185,7 +201,7 @@ class RecordWidget(QWidget):
         self.area_layout.addWidget(self.record_toggle_button, 0, 3, 0, 1, Qt.AlignCenter)
         self.area.setLayout(self.area_layout)
         if self.worker_video is None:
-            self.worker_video = VideoProcess('record_video.mp4')
+            self.worker_video = VideoProcess('temp/record_video.mp4')
             self.thread_video = self.parent().parent().create_thread()
             self.worker_video.moveToThread(self.thread_video)
             self.thread_video.started.connect(self.worker_video.run)
@@ -219,7 +235,7 @@ class RecordWidget(QWidget):
         else:
             self.record_toggle_button.connect(self.stop_record)
         if self.worker_audio is None:
-            self.worker_audio = AudioProcess('record_audio.wav')
+            self.worker_audio = AudioProcess('temp/record_audio.wav')
             self.thread_audio = self.parent().parent().create_thread()
             self.worker_audio.moveToThread(self.thread_audio)
             self.thread_audio.started.connect(self.worker_audio.record)
@@ -253,17 +269,15 @@ class RecordWidget(QWidget):
         if self.record_type == 'video':
             video = self.worker_video.get_output()
         audio = self.worker_audio.get_output()
-        parent = self.parent()
+        parent = self.parent().parent()
         self.record_toggle_button.setCursor(QCursor(Qt.ArrowCursor))
         if self.record_type == 'video':
-            merge(video, audio, 'record.mp4')
-            output = 'record.mp4'
+            merge(video, audio, 'temp/record.mp4')
+            output = 'temp/record.mp4'
         else:
-            output = 'record_audio.wav'
+            output = 'temp/record_audio.wav'
         clear_widget(self.parent())
-        player = MediaPlayerWidget(output, parent=parent)
-        player.setGeometry(128, 256, 1024, 512)
-        player.show()
+        parent.render_media_process(output)
 
     def toggle_record_audio(self):
         self.worker_audio.toggle_record()

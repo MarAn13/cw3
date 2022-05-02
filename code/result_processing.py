@@ -1,3 +1,19 @@
+"""
+Display resulting output (after model prediction)
+"""
+from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QScrollArea, QTextEdit, QGridLayout, QSizePolicy, QFileDialog, \
+    QStyle, QStyleOptionButton
+from PyQt5.Qt import Qt
+from PyQt5.QtGui import QCursor, QPainter, QPainterPath, QColor
+from PyQt5.QtCore import QTimer, QSize, QRectF
+from PyQt5.QtSvg import QSvgRenderer
+from ui_utils import resize_font
+from responsive_svg import ResponsiveIconButton
+import pandas as pd
+import openpyxl
+import docx
+
+
 class ResultWidget(QWidget):
     def __init__(self, result, parent=None):
         super().__init__(parent=parent)
@@ -81,13 +97,16 @@ class ResultWidget(QWidget):
         self.result_area.setGeometry(self.file_area.x() + self.file_area.width() + self.area.width() * 0.05,
                                      self.area.height() * 0.1, self.area.width() * 0.55, self.area.height() * 0.80)
         self.result_display.setGeometry(0, 0, self.result_area.width(), self.result_area.height() * 0.6)
-        self.wer_input_area.setGeometry(0, self.result_display.height(), self.result_area.width(), self.result_area.height() * 0.3)
-        self.wer_display_area.setGeometry(0, self.wer_input_area.y() + self.wer_input_area.height(), self.result_area.width(), self.result_area.height() * 0.1)
+        self.wer_input_area.setGeometry(0, self.result_display.height(), self.result_area.width(),
+                                        self.result_area.height() * 0.3)
+        self.wer_display_area.setGeometry(0, self.wer_input_area.y() + self.wer_input_area.height(),
+                                          self.result_area.width(), self.result_area.height() * 0.1)
         self.file_area_widget.resize(self.file_area.size())
         self.scroll.resize(self.file_area_widget.size())
         self.process_widget.setGeometry(self.area.x() + self.area.width() / 5, self.area.y() + self.area.height() + (
                 self.parent().height() - (self.area.y() + self.area.height())) / 5, self.area.width() * 0.6,
                                         (self.parent().height() - (self.area.y() + self.area.height())) * 0.4)
+
 
 class FileIconResult(QPushButton):
     def __init__(self, text, filetype, result, parent=None):
@@ -140,9 +159,9 @@ class FileIconResult(QPushButton):
         path.addRoundedRect(0, 0, self.width(), self.height(), 15, 15)
         painter.fillPath(path, QColor('#454545'))
         if self.filetype == 'video':
-            svg = QSvgRenderer('assets/video_file_icon.svg')
+            svg = QSvgRenderer('../assets/video_file_icon.svg')
         else:
-            svg = QSvgRenderer('assets/audio_file_icon.svg')
+            svg = QSvgRenderer('../assets/audio_file_icon.svg')
         painter.fillRect(QRectF(0, 0, self.height(), self.height()), QColor('red'))
         svg_size = QSize(self.height() / 1.5, self.height() / 1.5)
         svg.render(painter, QRectF(self.height() / 2 - svg_size.width() / 2, self.height() / 2 - svg_size.height() / 2,
@@ -191,6 +210,7 @@ class FileIconResult(QPushButton):
         painter.drawText(text_rect, Qt.AlignCenter, text)
         painter.end()
 
+
 class ExportWidget(QWidget):
     def __init__(self, data, parent=None):
         super().__init__(parent=parent)
@@ -201,13 +221,13 @@ class ExportWidget(QWidget):
         self.data = data
         self.pd_data = None
         self.area_layout = QGridLayout()
-        self.button_excel = ResponsiveIconButton('assets/export_excel.svg', parent=self)
+        self.button_excel = ResponsiveIconButton('../assets/export_excel.svg', parent=self)
         self.button_excel.setCursor(QCursor(Qt.PointingHandCursor))
         self.button_excel.clicked.connect(lambda: self.export('excel'))
-        self.button_word = ResponsiveIconButton('assets/export_word.svg', parent=self)
+        self.button_word = ResponsiveIconButton('../assets/export_word.svg', parent=self)
         self.button_word.setCursor(QCursor(Qt.PointingHandCursor))
         self.button_word.clicked.connect(lambda: self.export('word'))
-        self.button_text = ResponsiveIconButton('assets/export_text.svg', parent=self)
+        self.button_text = ResponsiveIconButton('../assets/export_text.svg', parent=self)
         self.button_text.setCursor(QCursor(Qt.PointingHandCursor))
         self.button_text.clicked.connect(lambda: self.export('text'))
         self.button_excel.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
