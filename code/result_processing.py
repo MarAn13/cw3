@@ -1,24 +1,15 @@
 class ResultWidget(QWidget):
-    def __init__(self, files, parent=None):
+    def __init__(self, result, parent=None):
         super().__init__(parent=parent)
         self.setStyleSheet(
-            '#area, #process_widget{background-color: #292929; border-radius: 15px;}'
+            '#area{background-color: #292929; border-radius: 15px;}'
             '#file_area, #result_area, #scroll_widget{background-color: #3A3A3A; border-radius: 15px; color: #FFFFFF;}'
             'QLabel{color: #FFFFFF; background-color: purple;}'
             'QScrollBar{background-color: #3A3A3A; width: 20px; border-radius: 15px; color:#FFFFFF;}'
+            'QTextEdit{background-color: #3A3A3A; border: 1px solid grey; color: #FFFFFF;}'
         )
-        # self.setFixedSize(1200, 800)
-        self.process_widget = QWidget(parent=self.parent())
-        self.process_widget.setObjectName('process_widget')
-        self.process_widget_layout = QGridLayout()
-        self.process_widget_button_excel = QPushButton('Excel', parent=self.process_widget)
-        self.process_widget_button_word = QPushButton('Word', parent=self.process_widget)
-        self.process_widget_button_text = QPushButton('Text', parent=self.process_widget)
-        self.process_widget_layout.addWidget(self.process_widget_button_excel, 0, 0, 1, 1)
-        self.process_widget_layout.addWidget(self.process_widget_button_word, 0, 1, 1, 1)
-        self.process_widget_layout.addWidget(self.process_widget_button_text, 0, 2, 1, 1)
-        self.process_widget.setLayout(self.process_widget_layout)
-        self.process_widget.setAutoFillBackground(True)
+        self.setFixedSize(1200, 800)
+        self.video_ext = ['mp3', 'mp4', 'webm', 'mkv']  # should make a param in config file
         self.area = QWidget(parent=self)
         self.area.setObjectName('area')
         self.file_area = QWidget(parent=self.area)
@@ -30,31 +21,58 @@ class ResultWidget(QWidget):
         file_area_text.setAlignment(Qt.AlignCenter)
         self.file_area_layout.addWidget(file_area_text, 0, 0, 1, 1)
         self.file_area_obj = []
-        for i, file in enumerate(files):
-            self.file_area_obj.append(FileIconResult(file, 'video', str(i), parent=self.file_area_widget))
+        for i, (file, res) in enumerate(result.items()):
+            if file.split('.')[-1] in self.video_ext:
+                file_type = 'video'
+            else:
+                file_type = 'audio'
+            self.file_area_obj.append(FileIconResult(file, file_type, res, parent=self.file_area_widget))
             temp = self.file_area_obj[-1]
             temp.setCursor(QCursor(Qt.PointingHandCursor))
             temp.clicked.connect(lambda _, arg=temp: self.show_result(arg))
             self.file_area_layout.addWidget(temp, i + 1, 0, 1, 1)
+        self.current_obj = self.file_area_obj[0]
         self.file_area_widget.setLayout(self.file_area_layout)
         self.file_area_widget.setObjectName('scroll_widget')
         self.scroll = QScrollArea(self.file_area)  # parent=self.file_area)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scroll.setWidgetResizable(True)
         self.scroll.setWidget(self.file_area_widget)
-        self.result_area = QTextEdit(parent=self.area)
+        self.result_area = QWidget(parent=self.area)
         self.result_area.setObjectName('result_area')
-        self.result_area.setReadOnly(True)
-        self.result_area.append('Result')
-        self.result_area.setAlignment(Qt.AlignCenter)
+        self.result_display = QTextEdit(parent=self.result_area)
+        self.result_display.setReadOnly(True)
+        self.result_display.viewport().setCursor(QCursor(Qt.ArrowCursor))
+        self.result_display.append('Result')
+        self.result_display.setAlignment(Qt.AlignCenter)
+        self.wer_input_area = QTextEdit(parent=self.result_area)
+        self.wer_input_area.setPlaceholderText('Enter your original text')
+        self.wer_input_area.textChanged.connect(self.update_wer)
+        self.wer_display_area = QTextEdit(parent=self.result_area)
+        self.wer_display_area.setReadOnly(True)
+        self.wer_display_area.viewport().setCursor(QCursor(Qt.ArrowCursor))
+        self.wer_display_area.append('WER:')
+        self.process_widget = QWidget(parent=self.parent())
+        self.process_widget.setObjectName('process_widget')
+        self.current_obj.click()
 
     def show_result(self, widget):
-        self.result_area.clear()
-        self.result_area.append('Result')
-        self.result_area.setAlignment(Qt.AlignCenter)
-        self.result_area.append('')
-        self.result_area.append(widget.getResult())
-        self.result_area.setAlignment(Qt.AlignLeft)
+        self.current_obj = widget
+        self.result_display.clear()
+        self.result_display.append('Result')
+        self.result_display.setAlignment(Qt.AlignCenter)
+        self.result_display.append('')
+        self.result_display.append(self.current_obj.getResult())
+        self.result_display.setAlignment(Qt.AlignLeft)
+        self.wer_input_area.setText(self.current_obj.getWER())
+
+    def update_wer(self):
+        self.current_obj.setWER(self.wer_input_area.toPlainText())
+        original_text = self.current_obj.getWER()
+        pred_text = self.current_obj.getResult()
+        print(original_text, pred_text)
+        wer = '50'
+        self.wer_display_area.setText(f'WER: {wer}%')
 
     def resizeEvent(self, e):
         self.area.resize(self.width(), self.height())
@@ -62,17 +80,14 @@ class ResultWidget(QWidget):
                                    self.area.height() * 0.80)
         self.result_area.setGeometry(self.file_area.x() + self.file_area.width() + self.area.width() * 0.05,
                                      self.area.height() * 0.1, self.area.width() * 0.55, self.area.height() * 0.80)
+        self.result_display.setGeometry(0, 0, self.result_area.width(), self.result_area.height() * 0.6)
+        self.wer_input_area.setGeometry(0, self.result_display.height(), self.result_area.width(), self.result_area.height() * 0.3)
+        self.wer_display_area.setGeometry(0, self.wer_input_area.y() + self.wer_input_area.height(), self.result_area.width(), self.result_area.height() * 0.1)
         self.file_area_widget.resize(self.file_area.size())
         self.scroll.resize(self.file_area_widget.size())
-        # self.process_widget.setGeometry(345, 820, 600, 150)
-        self.process_widget.setGeometry(self.x() + self.width() / 5, self.y() + self.height() + (
-                    self.parent().height() - (self.y() + self.height())) * 0.2, self.width() * 0.6,
-                                        (self.parent().height() - (self.y() + self.height())) * 0.6)
-
-
-    def showEvent(self, e):
-        self.show()
-        self.process_widget.show()
+        self.process_widget.setGeometry(self.area.x() + self.area.width() / 5, self.area.y() + self.area.height() + (
+                self.parent().height() - (self.area.y() + self.area.height())) / 5, self.area.width() * 0.6,
+                                        (self.parent().height() - (self.area.y() + self.area.height())) * 0.4)
 
 class FileIconResult(QPushButton):
     def __init__(self, text, filetype, result, parent=None):
@@ -81,6 +96,7 @@ class FileIconResult(QPushButton):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.aspect = (5, 1)  # width / height
         self.text = text
+        self.wer_text = None
         self.text_font = None
         self.filetype = filetype
         self.result = result
@@ -94,6 +110,12 @@ class FileIconResult(QPushButton):
 
     def getResult(self):
         return self.result
+
+    def getWER(self):
+        return self.wer_text
+
+    def setWER(self, wer_text):
+        self.wer_text = wer_text
 
     def setFont(self, font):
         self.text_font = font
@@ -168,3 +190,65 @@ class FileIconResult(QPushButton):
         painter.fillRect(text_rect, QColor('blue'))
         painter.drawText(text_rect, Qt.AlignCenter, text)
         painter.end()
+
+class ExportWidget(QWidget):
+    def __init__(self, data, parent=None):
+        super().__init__(parent=parent)
+        self.setStyleSheet(
+            '#area{background-color: #252525; border-radius: 15px;}'
+        )
+        self.setObjectName('area')
+        self.data = data
+        self.pd_data = None
+        self.area_layout = QGridLayout()
+        self.button_excel = ResponsiveIconButton('assets/export_excel.svg', parent=self)
+        self.button_excel.setCursor(QCursor(Qt.PointingHandCursor))
+        self.button_excel.clicked.connect(lambda: self.export('excel'))
+        self.button_word = ResponsiveIconButton('assets/export_word.svg', parent=self)
+        self.button_word.setCursor(QCursor(Qt.PointingHandCursor))
+        self.button_word.clicked.connect(lambda: self.export('word'))
+        self.button_text = ResponsiveIconButton('assets/export_text.svg', parent=self)
+        self.button_text.setCursor(QCursor(Qt.PointingHandCursor))
+        self.button_text.clicked.connect(lambda: self.export('text'))
+        self.button_excel.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.button_word.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.button_text.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.area_layout.addWidget(self.button_excel, 0, 0, 1, 1)
+        self.area_layout.addWidget(self.button_word, 0, 2, 1, 1)
+        self.area_layout.addWidget(self.button_text, 0, 4, 1, 1)
+        self.setLayout(self.area_layout)
+        for i in range(self.area_layout.columnCount()):
+            self.area_layout.setColumnStretch(i, 1)
+
+    def export(self, mode):
+        ext = {
+            'excel': ['xlsx', 'csv'],
+            'word': ['docx'],
+            'text': ['txt']
+        }
+        file = QFileDialog.getSaveFileName(self, 'Save file', '',
+                                           f'{mode[0].upper() + mode[1:]} ({" ".join("*." + i for i in ext[mode])})')
+        if file == ('', ''):
+            return
+        else:
+            file = file[0]
+        if self.pd_data is None:
+            self.pd_data = pd.DataFrame(self.data.items(), columns=['file', 'result'])
+        if mode == 'excel':
+            if file.split('.')[-1] == 'xlsx':
+                self.pd_data.to_excel(file)
+            else:
+                self.pd_data.to_csv(file)
+        elif mode == 'word':
+            doc = docx.Document()
+            table = doc.add_table(self.pd_data.shape[0], self.pd_data.shape[1])
+            table_cells = table._cells
+            for i in range(self.pd_data.shape[0]):
+                for j in range(self.pd_data.shape[1]):
+                    table_cells[j + i * self.pd_data.shape[1]].text = str(self.pd_data.values[i][j])
+            doc.save(file)
+        elif mode == 'text':
+            with open(file, 'w') as f:
+                max_width = max(len(key) for key in self.data.keys())
+                for key, val in self.data.items():
+                    f.write(f'{key.ljust(max_width + 1) + val}\n')
