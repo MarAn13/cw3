@@ -3,12 +3,11 @@ from argparse import ArgumentParser
 from pydub import AudioSegment
 import torch.tensor
 import os
-import sys
-from ..other.deep_avsr.audio_only.util import predict as pred_audio_only
-from ..other.deep_avsr.video_only.util import predict as pred_video_only
-from ..other.deep_avsr.audio_visual.util import predict as pred_audio_video
-from ..other.deep_avsr.audio_visual.config import args
-from ..other.deep_avsr.audio_visual.utils.metrics import compute_wer as get_wer
+from other.deep_avsr.audio_only.util import predict as pred_audio_only
+from other.deep_avsr.video_only.util import predict as pred_video_only
+from other.deep_avsr.audio_visual.util import predict as pred_audio_video
+from other.deep_avsr.audio_visual.config import args
+from other.deep_avsr.audio_visual.utils.metrics import compute_wer as get_wer
 
 params = {
     'INPUT_FORMAT': 'mp4',
@@ -230,7 +229,7 @@ def compute_wer(data):
 def get_tensor_batch(data):
     batch = [args['CHAR_TO_INDEX'][i] for i in data]
     batch.append(args['CHAR_TO_INDEX']['<EOS>'])
-    batch = torch.tensor(data, dtype=torch.int32)
+    batch = torch.tensor(batch, dtype=torch.int32)
     return batch
 
 
@@ -246,6 +245,9 @@ def main():
 
 if __name__ == '__main__':
     # main()
-    print(compute_wer({'test': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELLO MY FRIEND NICE TO MEET YOU'],
-                 'test1': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELYU MY FRIND NCE TO MEIT U'],
-                 'test2': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELLO FRIEND NECE TO MEET YOU']}))
+    # print(compute_wer({'test': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELLO MY FRIEND NICE TO MEET YOU'],
+    #              'test1': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELYU MY FRIND NCE TO MEIT U'],
+    #              'test2': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELLO FRIEND NECE TO MEET YOU']}))
+    print('audio_only', predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-only\test.mp4'], 'audio-only'))
+    print('video_only', predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\video-only\test5.mp4'], 'video-only'))
+    print('audio_video', predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'], 'audio-video'))

@@ -2,16 +2,62 @@
 Display resulting output (after model prediction)
 """
 from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QScrollArea, QTextEdit, QGridLayout, QSizePolicy, QFileDialog, \
-    QStyle, QStyleOptionButton
+    QStyle, QStyleOptionButton, QGraphicsOpacityEffect
 from PyQt5.Qt import Qt
-from PyQt5.QtGui import QCursor, QPainter, QPainterPath, QColor
-from PyQt5.QtCore import QTimer, QSize, QRectF
+from PyQt5.QtGui import QCursor, QPainter, QPainterPath, QColor, QMovie
+from PyQt5.QtCore import QTimer, QSize, QRectF, QObject, pyqtSignal
 from PyQt5.QtSvg import QSvgRenderer
 from ui_utils import resize_font
 from responsive_svg import ResponsiveIconButton
+from utils import predict
 import pandas as pd
 import openpyxl
 import docx
+
+
+class LoadingScreen(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.finish)
+        self.opacity = 0.7
+        self.area = QWidget(self)
+        self.area_layout = QGridLayout()
+        self.area_layout.setContentsMargins(0, 0, 0, 0)
+        self.movie = QMovie('../assets/loading.gif')
+        self.label = QLabel(self.area)
+        self.label.setMovie(self.movie)
+        self.movie.start()
+        self.area_layout.addWidget(self.label, 0, 0, 1, 1, Qt.AlignCenter)
+        self.area.setLayout(self.area_layout)
+
+    def finish(self):
+        self.timer.start(250)
+
+    def eclipse(self):
+        temp = QGraphicsOpacityEffect()
+        self.opacity -= 0.1
+        temp.setOpacity(self.opacity)
+        self.setGraphicsEffect(temp)
+        if self.opacity == 0:
+            self.timer.stop()
+
+    def resizeEvent(self, e):
+        self.area.resize(self.width(), self.height())
+        self.movie.setScaledSize(self.size())
+
+
+class ResultProcess(QObject):
+    finished = pyqtSignal(dict, str)
+
+    def __init__(self, files, mode):
+        super().__init__()
+        self.files = files
+        self.mode = mode
+
+    def process(self):
+        result = predict(self.files, self.mode)
+        self.finished.emit(result, self.mode)
 
 
 class ResultWidget(QWidget):

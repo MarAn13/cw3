@@ -11,6 +11,8 @@ from PyQt5.QtMultimediaWidgets import QVideoWidget
 from ui_utils import ms_to_time, resize_font, clear_widget
 from utils import check_streams
 from responsive_svg import SvgWidgetAspect
+from result_processing import ResultWidget, ResultProcess, LoadingScreen
+import os
 
 
 class MediaSlider(QSlider):
@@ -70,7 +72,8 @@ class MediaPlayerWidget(QWidget):
         self.area = QWidget(parent=self)
         self.area.setObjectName('area')
         self.area_layout = QGridLayout()
-        self.process_widget = ProcessWidget(file, False, parent=self.parent())
+        # self.process_widget = ProcessWidget(file, False, parent=self.parent())
+        self.process_widget = self.parent().parent().render_process_widget(file, False)
         self.media_player = QMediaPlayer(flags=QMediaPlayer.VideoSurface, parent=self)
         self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file)))
         self.value_change_loop_control = True
@@ -213,9 +216,9 @@ class MediaPlayerWidget(QWidget):
     def resizeEvent(self, e):
         self.area.setFixedSize(self.width(), self.height())
 
-    def showEvent(self, e):
-        self.show()
-        self.process_widget.show()
+    # def showEvent(self, e):
+    #     self.show()
+    #     self.process_widget.show()
 
 
 class ProcessWidget(QWidget):
@@ -230,7 +233,7 @@ class ProcessWidget(QWidget):
             'QRadioButton[cssClass~=disabled]{color: grey; background-color: yellow;}'
             'QRadioButton::indicator[cssClass~=disabled]{background-color: grey;}'
         )
-        self.setGeometry(345, 820, 600, 150)
+        # self.setGeometry(345, 820, 600, 150)
         self.area = QLabel(parent=self)
         self.area.setObjectName('area')
         self.file_type = 'other'
@@ -239,6 +242,7 @@ class ProcessWidget(QWidget):
                 self.file_type = 'video'
             else:
                 self.file_type = 'audio'
+            files = [files]
             self.record_area = QLabel(parent=self.area)
             self.record_area_layout = QVBoxLayout()
             if self.file_type == 'video':
@@ -275,9 +279,9 @@ class ProcessWidget(QWidget):
             self.radio_area_layout.addWidget(self.radio_button_video_only)
             self.radio_area_layout.addWidget(self.radio_button_audio_video)
             self.radio_area.setLayout(self.radio_area_layout)
-            self.audio_only = []
-            self.video_only = []
-            self.audio_video = []
+        self.audio_only = []
+        self.video_only = []
+        self.audio_video = []
         self.button_area = QLabel(parent=self.area)
         self.button_area_layout = QVBoxLayout()
         self.process_button = QPushButton('Process', parent=self.button_area)
@@ -285,8 +289,18 @@ class ProcessWidget(QWidget):
         self.process_button.clicked.connect(self.process)
         self.button_area_layout.addWidget(self.process_button, alignment=Qt.AlignCenter)
         self.button_area.setLayout(self.button_area_layout)
+        self.result = {
+            'audio-only': None,
+            'video-only': None,
+            'audio-video': None
+        }
+        self.threads = []
+        self.workers = []
+        files = [os.path.abspath(file) for file in files]
         if not self.file_type == 'audio':
             self.check_files(files)
+        else:
+            self.audio_only = files
 
     def check_files(self, files):
         self.audio_only = []
@@ -331,6 +345,38 @@ class ProcessWidget(QWidget):
 
     def process(self):
         print('process')
+        parent = self.parent().parent()
+        if parent.screen_widgets['media_widget']:
+            parent.screen_widgets['media_widget'].setVisible(False)
+        if parent.screen_widgets['file_upload_widget']:
+            parent.screen_widgets['file_upload_widget'].setVisible(False)
+        self.setVisible(False)
+        # clear_widget(self.parent())
+        parent.render_loading_screen()
+        for files, mode in [[self.audio_only, 'audio-only'], [self.video_only, 'video-only'], [self.audio_video, 'audio-video']]:
+            print(files, mode)
+            if len(files) > 0:
+                thread = parent.create_thread()
+                worker = ResultProcess(files, mode)
+                worker.moveToThread(thread)
+                thread.started.connect(worker.process)
+                worker.finished.connect(self.process_result)
+                thread.start()
+                self.threads.append(thread)
+                self.workers.append(worker)
+            else:
+                self.result[mode] = []
+
+    def process_result(self, result, mode):
+        print('process_result')
+        self.result[mode] = result
+        if self.result['audio-only'] is not None and self.result['video-only'] is not None and self.result['audio-video'] is not None:
+            result = dict()
+            for i, j in self.result.items():
+                result.update(j)
+            clear_widget(self.parent())
+            self.parent().parent().render_result_process(result)
+
 
     def resizeEvent(self, e):
         self.area.setGeometry(0, 0, self.width(), self.height())

@@ -9,8 +9,8 @@ from ui_utils import clear_widget
 from responsive_svg import SvgWidgetAspect, ResponsiveIconButton
 from file_upload_processing import FileUploadWidget
 from record_processing import RecordWidget
-from result_processing import ResultWidget
-from media_processing import MediaPlayerWidget
+from result_processing import ResultWidget, LoadingScreen
+from media_processing import MediaPlayerWidget, ProcessWidget
 
 
 class MainWindow(QMainWindow):
@@ -82,6 +82,13 @@ class MainWindow(QMainWindow):
         self.screen = QWidget(parent=self)
         self.screen.setObjectName('screen')
         self.screen.setGeometry(160, 0, 1280, 1024)
+        self.screen_widgets = {
+            'file_upload_widget': None,
+            'record_widget': None,
+            'media_widget': None,
+            'process_widget': None,
+            'result_widget': None
+        }
         self.threads = []
         self.render_file_upload()
 
@@ -103,27 +110,69 @@ class MainWindow(QMainWindow):
 
     def render_file_upload(self):
         clear_widget(self.screen)
+        self.reset_screen_widgets()
         screen_file_upload = FileUploadWidget(parent=self.screen)
         screen_file_upload.setGeometry(128, 256, 1024, 512)
         screen_file_upload.show()
+        self.screen_widgets['file_upload_widget'] = screen_file_upload
         return screen_file_upload
 
     def render_record(self, record_type):
         clear_widget(self.screen)
+        self.reset_screen_widgets()
         self.clear_thread()
         screen_record_video = RecordWidget(record_type, parent=self.screen)
         screen_record_video.render_default()
         screen_record_video.setGeometry(128, 256, 1024, 512)
         screen_record_video.show()
+        self.screen_widgets['record_widget'] = screen_record_video
         return screen_record_video
 
     def render_media_process(self, output):
         clear_widget(self.screen)
+        self.reset_screen_widgets()
         self.clear_thread()
-        screen_record_audio = MediaPlayerWidget(output, parent=self.screen)
-        screen_record_audio.setGeometry(128, 256, 1024, 512)
-        screen_record_audio.show()
-        return screen_record_audio
+        screen_media = MediaPlayerWidget(output, parent=self.screen)
+        screen_media.setGeometry(128, 256, 1024, 512)
+        screen_media.show()
+        self.screen_widgets['media_widget'] = screen_media
+        return screen_media
+
+    def render_loading_screen(self):
+        # clear_widget(self.screen)
+        # self.clear_thread()
+        loading_screen = LoadingScreen(parent=self.screen)
+        loading_screen.setFixedSize(self.screen.width(), self.screen.height())
+        loading_screen.show()
+        return loading_screen
+
+    def render_process_widget(self, files, file_process):
+        # clear_widget(self.screen)
+        # self.clear_thread()
+        process = ProcessWidget(files, file_process, parent=self.screen)
+        process.setGeometry(345, 820, 600, 150)
+        process.show()
+        self.screen_widgets['process_widget'] = process
+        return process
+
+    def render_result_process(self, files):
+        clear_widget(self.screen)
+        self.reset_screen_widgets()
+        self.clear_thread()
+        screen_result = ResultWidget(files, parent=self.screen)
+        screen_result.setGeometry(128, 256, 1024, 512)
+        screen_result.show()
+        self.screen_widgets['result_widget'] = screen_result
+        return screen_result
+
+    def reset_screen_widgets(self):
+        self.screen_widgets = {
+            'file_upload_widget': None,
+            'record_widget': None,
+            'media_widget': None,
+            'process_widget': None,
+            'result_widget': None
+        }
 
     def closeEvent(self, e):
         clear_widget(self)

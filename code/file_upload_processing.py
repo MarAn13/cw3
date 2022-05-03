@@ -99,15 +99,14 @@ class FileUploadWidget(QLabel):
                 file_type = 'audio'
             self.layout.addWidget(FileIcon(file, file_type, self), row, col, 1, 1)
             col += 1
-            self.files = files
-            if self.process is None:
-                self.process = self.render_process()
-            else:
-                self.process.check_files(self.files)
+        self.files = files
+        if self.process is None:
+            self.process = self.render_process()
+        else:
+            self.process.check_files(self.files)
 
     def render_process(self):
-        process = ProcessWidget(self.files, True, parent=self.parent())
-        process.show()
+        process = self.parent().parent().render_process_widget(self.files, True)
         return process
 
     def resizeEvent(self, e):

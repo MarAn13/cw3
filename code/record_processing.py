@@ -278,7 +278,7 @@ class RecordWidget(QWidget):
             output = 'temp/record.mp4'
         else:
             output = 'temp/record_audio.wav'
-        clear_widget(self.parent())
+        # clear_widget(self.parent())
         parent.render_media_process(output)
 
     def toggle_record_audio(self):
