@@ -9,7 +9,7 @@ from ui_utils import clear_widget
 from responsive_svg import SvgWidgetAspect, ResponsiveIconButton
 from file_upload_processing import FileUploadWidget
 from record_processing import RecordWidget
-from result_processing import ResultWidget, LoadingScreen
+from result_processing import ResultWidget, LoadingScreen, ExportWidget
 from media_processing import MediaPlayerWidget, ProcessWidget
 
 
@@ -87,7 +87,8 @@ class MainWindow(QMainWindow):
             'record_widget': None,
             'media_widget': None,
             'process_widget': None,
-            'result_widget': None
+            'result_widget': None,
+            'export_widget': None
         }
         self.threads = []
         self.render_file_upload()
@@ -164,6 +165,15 @@ class MainWindow(QMainWindow):
         screen_result.show()
         self.screen_widgets['result_widget'] = screen_result
         return screen_result
+
+    def render_export_widget(self, files):
+        # clear_widget(self.screen)
+        # self.clear_thread()
+        export = ExportWidget(files, parent=self.screen)
+        export.setGeometry(345, 820, 600, 150)
+        export.show()
+        self.screen_widgets['export_widget'] = export
+        return export
 
     def reset_screen_widgets(self):
         self.screen_widgets = {

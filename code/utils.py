@@ -76,8 +76,7 @@ def get_chunk_times_audio(filepath):
             temp_stop = temp_start + params['MIN_SPLIT_LEN']
             processed_time.append([temp_start, temp_stop])
             temp_start = temp_stop
-        processed_time.append([current_time, duration])
-        print(processed_time)
+        processed_time.append([temp_start, duration])
         processed_chunks = []
         temp = []
         chunk_duration = 0
@@ -85,11 +84,13 @@ def get_chunk_times_audio(filepath):
             temp_duration = stop - start
             if chunk_duration + temp_duration < params['MIN_SPLIT_LEN']:
                 temp.append([start, stop])
+                chunk_duration += temp_duration
             else:
+                if len(temp) == 0:
+                    temp = [[start, stop]]
                 processed_chunks.append(temp)
-                temp = [[start, stop]]
+                temp = []
                 chunk_duration = 0
-            chunk_duration += temp_duration
         processed_chunks.append(temp)
     else:
         processed_chunks = [[[0, duration]]]
@@ -111,39 +112,45 @@ def get_chunk_times_video(filepath):
     return processed_chunks
 
 
-def split(filepath, overwrite):
+def split(filepath, overwrite=False):
     check_audio, check_video = check_streams(filepath)
     if not check_audio:
         processed_chunks = get_chunk_times_video(filepath)
     else:
         processed_chunks = get_chunk_times_audio(filepath)
+    outputs = []
     for i, chunk in enumerate(processed_chunks):
         stream = None
-        stream_audio = None
-        stream_video = None
+        # stream_audio = None
+        # stream_video = None
         for start, stop in chunk:
             temp_stream = ffmpeg.input(filepath, ss=start, to=stop)
             if stream is None:
-                stream = True
-                stream_video = temp_stream.video
-                stream_audio = temp_stream.audio
+                # stream = True
+                # stream_video = temp_stream.video
+                # stream_audio = temp_stream.audio
+                stream = temp_stream
             else:
-                stream_video = ffmpeg.concat(stream_video, temp_stream.video, v=1, a=0)
-                stream_audio = ffmpeg.concat(stream_audio, temp_stream.audio, v=0, a=1)
-        stream = ffmpeg.concat(stream_video, stream_audio, v=1, a=1)
-        stream = ffmpeg.output(stream, f'{filepath.split(".")[-2]}_chunk_{i}.mp4')
+                # stream_video = ffmpeg.concat(stream_video, temp_stream.video, v=1, a=0)
+                # stream_audio = ffmpeg.concat(stream_audio, temp_stream.audio, v=0, a=1)
+                stream = ffmpeg.concat(temp_stream)
+        # stream = ffmpeg.concat(stream_video, stream_audio, v=1, a=1)
+        output = f'{"".join(filepath.split(".")[:-1])}_chunk_{i}.mp4'
+        stream = ffmpeg.output(stream, output)
         ffmpeg.run(stream, overwrite_output=True, quiet=True)
+        outputs.append(output)
     if overwrite:
         os.remove(filepath)
+    return outputs
 
 
-def convert(filepath, overwrite):
+def convert(filepath, mode, overwrite=False):
     check_audio, check_video = check_streams(filepath)
     output = filepath.split('.')
     output[-2] += '_output'
     output = '.'.join(output)
     stream = ffmpeg.input(filepath)
-    if check_video:
+    if check_video and (mode == 'audio-video' or mode == 'video-only'):
         stream_video = stream.video
         stream_video = ffmpeg.filter(stream_video,
                                      'scale',
@@ -155,12 +162,12 @@ def convert(filepath, overwrite):
                                      fps=params['VIDEO_FPS'],
                                      round='up'
                                      )
-        if check_audio:
+        if check_audio and mode == 'audio-video':
             stream_audio = stream.audio
             stream = ffmpeg.concat(stream_video, stream_audio, v=1, a=1)
         else:
             stream = stream_video
-    if check_video and check_audio:
+    if check_video and check_audio and mode == 'audio-video':
         stream = ffmpeg.output(stream,
                                output,
                                f=params['OUTPUT_FORMAT'],
@@ -170,7 +177,7 @@ def convert(filepath, overwrite):
                                crf=params['CRF'],
                                preset=params['PRESET']
                                )
-    elif check_video:
+    elif check_video and mode == 'video-only':
         stream = ffmpeg.output(stream,
                                output,
                                f=params['OUTPUT_FORMAT'],
@@ -178,7 +185,7 @@ def convert(filepath, overwrite):
                                preset=params['PRESET']
                                )
     else:
-        stream = ffmpeg.output(stream,
+        stream = ffmpeg.output(stream.audio,
                                output,
                                f=params['OUTPUT_FORMAT'],
                                ac=params['AUDIO_CHANNELS'],
@@ -213,17 +220,13 @@ def predict(files, mode):
     return pred
 
 
-def compute_wer(data):
-    # data - dictionary {file: [original, pred]}
-    result = dict()
-    for file, [original, pred] in data.items():
-        original_batch = get_tensor_batch(original)
-        original_batch_len = torch.tensor(len(original_batch), dtype=torch.int32)
-        pred_batch = get_tensor_batch(pred)
-        pred_batch_len = torch.tensor(len(pred_batch), dtype=torch.int32)
-        wer = get_wer(pred_batch, original_batch, pred_batch_len, original_batch_len, args['CHAR_TO_INDEX'][' '])
-        result[file] = wer
-    return result
+def compute_wer(original, pred):
+    original_batch = get_tensor_batch(original.upper())
+    original_batch_len = torch.tensor(len(original_batch), dtype=torch.int32)
+    pred_batch = get_tensor_batch(pred.upper())
+    pred_batch_len = torch.tensor(len(pred_batch), dtype=torch.int32)
+    wer = min(100, get_wer(pred_batch, original_batch, pred_batch_len, original_batch_len, args['CHAR_TO_INDEX'][' ']) * 100)
+    return wer
 
 
 def get_tensor_batch(data):
@@ -231,6 +234,16 @@ def get_tensor_batch(data):
     batch.append(args['CHAR_TO_INDEX']['<EOS>'])
     batch = torch.tensor(batch, dtype=torch.int32)
     return batch
+
+
+def process_convert(files, mode):
+    result = dict()
+    for file in files:
+        result[file] = []
+        output = split(file)
+        for i in output:
+            result[file].append(convert(i, mode))
+    return result
 
 
 def main():
@@ -248,6 +261,16 @@ if __name__ == '__main__':
     # print(compute_wer({'test': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELLO MY FRIEND NICE TO MEET YOU'],
     #              'test1': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELYU MY FRIND NCE TO MEIT U'],
     #              'test2': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELLO FRIEND NECE TO MEET YOU']}))
-    print('audio_only', predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-only\test.mp4'], 'audio-only'))
-    print('video_only', predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\video-only\test5.mp4'], 'video-only'))
-    print('audio_video', predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'], 'audio-video'))
+    # print('audio_only',
+    #       predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-only\test.mp4'],
+    #               'audio-only'))
+    # print('video_only',
+    #       predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\video-only\test5.mp4'],
+    #               'video-only'))
+    # print('audio_video',
+    #       predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'],
+    #               'audio-video'))
+    # print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'], 'audio-video'))
+    print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-only\test2.mp4'], 'audio-only'))
+    # print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\video-only\test5.mp4']))
+    print('done')

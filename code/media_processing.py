@@ -353,7 +353,8 @@ class ProcessWidget(QWidget):
         self.setVisible(False)
         # clear_widget(self.parent())
         parent.render_loading_screen()
-        for files, mode in [[self.audio_only, 'audio-only'], [self.video_only, 'video-only'], [self.audio_video, 'audio-video']]:
+        for files, mode in [[self.audio_only, 'audio-only'], [self.video_only, 'video-only'],
+                            [self.audio_video, 'audio-video']]:
             print(files, mode)
             if len(files) > 0:
                 thread = parent.create_thread()
@@ -370,13 +371,13 @@ class ProcessWidget(QWidget):
     def process_result(self, result, mode):
         print('process_result')
         self.result[mode] = result
-        if self.result['audio-only'] is not None and self.result['video-only'] is not None and self.result['audio-video'] is not None:
+        if self.result['audio-only'] is not None and self.result['video-only'] is not None and self.result[
+            'audio-video'] is not None:
             result = dict()
             for i, j in self.result.items():
                 result.update(j)
             clear_widget(self.parent())
             self.parent().parent().render_result_process(result)
-
 
     def resizeEvent(self, e):
         self.area.setGeometry(0, 0, self.width(), self.height())
