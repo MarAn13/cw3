@@ -17,6 +17,6 @@
 ## Neural network setup guide
 ### forked from https://github.com/lordmartian/deep_avsr
     place pre-trained weights of AO, VO, AV models in 'code/other/deep_avsr/../final/models' directory for the corresponding NN model
-    place visual frontend and language model in 'code/other/weights/' named language_model.pt and visual_frontend.pt
+    place visual frontend and language model in 'code/other/weights/' named visual_frontend.pt and language_model.pt
 
 ## Launch application via code/main.py file
