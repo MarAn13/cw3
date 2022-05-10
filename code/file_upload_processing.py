@@ -18,36 +18,31 @@ class FileUploadWidget(QLabel):
         super().__init__(parent=parent)
         self.setObjectName('file_upload')
         self.setStyleSheet(
-            '#test{background-color: red;}'
-            '#test1{background-color: blue;}'
-            '#file_upload{background-color: #292929;border: 3px dashed #FFFFFF;border-radius: 15px;}'
+            '#file_upload{border: 3px dashed #FFFFFF;border-radius: 15px;}'
             'QWidget{color: #FFFFFF;}'
             '#browse_button{background: none;border: 3px solid #00FFFF;border-radius: 15px;}'
+            '#scroll_widget{background: #1B1B1B;}'
+            'QScrollBar{background-color: #3A3A3A; width: 20px; border-radius: 15px; color:#FFFFFF;}'
         )
-        self.video_ext = ['mp3', 'mp4', 'webm', 'mkv']
-        self.audio_ext = ['ogg', 'wav', 'flac']
+        self.video_ext = ['mp3', 'mp4', 'webm', 'mkv', 'wmv', 'avi', 'mov', 'flv']
+        self.audio_ext = ['m4a', 'mp3', 'mp4', 'ogg', 'wav', 'flac', 'wma']
         self.button_area = QLabel(parent=self)
         self.button_area.setGeometry(0, self.geometry().height() - 160, self.geometry().width(), 160)
-        self.button_area.setObjectName('test1')
         self.layout_area = QLabel(parent=self)
         self.layout_area.setGeometry(0, 0, self.geometry().width(),
                                      self.geometry().height() - self.button_area.geometry().height())
-        self.layout_area.setObjectName('test')
         self.scroll_widget = QWidget(parent=self.layout_area)
+        self.scroll_widget.setObjectName('scroll_widget')
+        self.scroll_widget.setAutoFillBackground(True)
         self.scroll = QScrollArea(parent=self.layout_area)
-        self.scroll.setBackgroundRole(QPalette.Dark)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.scroll.setGeometry(0, 0, self.layout_area.width(), self.layout_area.height())
+        self.scroll.setGeometry(2, 2, self.layout_area.width() - 4, self.layout_area.height() - 4)
         self.scroll.setWidgetResizable(True)
         self.scroll.setWidget(self.scroll_widget)
         self.layout = QGridLayout()
         self.text = QLabel("Drag and Drop files here", parent=self)
         self.text.setAlignment(Qt.AlignCenter)
-        # self.upload_icon = QSvgWidget('../assets/file_upload_upload.svg', parent=self)
         self.upload_icon = SvgWidgetAspect('../assets/file_upload_upload.svg', (176, 213), parent=self)
-
-        # self.upload_icon.setPixmap()
-        # self.upload_icon.setAlignment(Qt.AlignCenter)
         self.browse_button = QPushButton('Browse', parent=self)
         self.browse_button.setObjectName('browse_button')
         self.browse_button.setGeometry(self.button_area.geometry().width() / 2 - 60,
@@ -94,8 +89,9 @@ class FileUploadWidget(QLabel):
                 row += 1
                 self.layout.setRowStretch(row, stretch)
             self.layout.setColumnStretch(col, stretch)
-            file_type = 'video'
-            if file[-1] in self.audio_ext:
+            if file.split('.')[-1] in self.video_ext:
+                file_type = 'video'
+            else:
                 file_type = 'audio'
             self.layout.addWidget(FileIcon(file, file_type, self), row, col, 1, 1)
             col += 1
@@ -116,15 +112,7 @@ class FileUploadWidget(QLabel):
         self.browse_button.setGeometry(self.button_area.geometry().width() / 2 - 60,
                                        self.button_area.geometry().y() + self.button_area.geometry().height() / 2 - 30,
                                        120, 60)
-        self.scroll.setGeometry(0, 0, self.layout_area.width(), self.layout_area.height())
-
-    # def paintEvent(self, e):
-    #     p = QPainter(self)
-    #     pen = QPen(QColor('#FFFFFF'))
-    #     p.setPen(pen)
-    #     pen.setStyle(Qt.DashLine)
-    #     p.setBrush(QBrush(QColor('#292929')))
-    #     p.drawRoundedRect(0, 0, self.geometry().width(), self.geometry().height(), 15, 15)
+        self.scroll.setGeometry(2, 2, self.layout_area.width() - 4, self.layout_area.height() - 4)
 
     def dragEnterEvent(self, e):
         if e.mimeData().hasUrls():
@@ -149,19 +137,11 @@ class FileUploadWidget(QLabel):
                 res_files.append(file)
         self.render_uploaded(res_files)
 
-    def dragLeaveEvent(self, e):
-        print('drag_out')
-
-    def dragMoveEvent(self, e):
-        print('drag_move')
-
 
 class FileIcon(QWidget):
     def __init__(self, text, file_type, parent=None):
         super().__init__(parent=parent)
-        self.setStyleSheet('QWidget{background-color: black; color: #FFFFFF}'
-                           '#icon{background-color: purple;}'
-                           '#text{background-color: green;}')
+        self.setStyleSheet('QWidget{background-color: none; color: #FFFFFF}')
         self.setMinimumSize(60, 100)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.aspect_ratio = (8, 10)
@@ -169,13 +149,10 @@ class FileIcon(QWidget):
             self.icon = QSvgWidget('../assets/video_file_icon.svg', parent=self)
         else:
             self.icon = QSvgWidget('../assets/audio_file_icon.svg', parent=self)
-        self.icon.setObjectName('icon')
         self.text = QLabel(parent=self)
         self.text.setText(text)
-        self.text.setObjectName('text')
         self.text.setAlignment(Qt.AlignCenter)
         self.layout = QVBoxLayout()
-        self.layout.setObjectName('layout')
         self.layout.addWidget(self.icon)
         self.layout.addWidget(self.text)
         self.layout.setContentsMargins(0, 0, 0, 0)
@@ -195,10 +172,3 @@ class FileIcon(QWidget):
         self.text.setFixedSize(real_width, real_height * 0.25)
         font, step = resize_font(self.text)
         self.text.setFont(font)
-
-#
-# app = QApplication([])
-# window = FileUploadWidget()
-# window.setFixedSize(1200, 800)
-# window.show()
-# app.exec_()

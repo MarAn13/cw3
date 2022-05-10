@@ -2,10 +2,10 @@
 Display resulting output (after model prediction)
 """
 from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QScrollArea, QTextEdit, QGridLayout, QSizePolicy, QFileDialog, \
-    QStyle, QStyleOptionButton, QGraphicsOpacityEffect
+    QStyle, QStyleOptionButton, QGraphicsOpacityEffect, QLineEdit
 from PyQt5.Qt import Qt
-from PyQt5.QtGui import QCursor, QPainter, QPainterPath, QColor, QMovie
-from PyQt5.QtCore import QTimer, QSize, QRectF, QObject, pyqtSignal
+from PyQt5.QtGui import QCursor, QPainter, QPainterPath, QColor, QMovie, QRegExpValidator
+from PyQt5.QtCore import QTimer, QSize, QRectF, QObject, pyqtSignal, QRegExp
 from PyQt5.QtSvg import QSvgRenderer
 from ui_utils import resize_font
 from responsive_svg import ResponsiveIconButton
@@ -69,11 +69,11 @@ class ResultWidget(QWidget):
         self.setStyleSheet(
             '#area{background-color: #292929; border-radius: 15px;}'
             '#file_area, #result_area, #scroll_widget{background-color: #3A3A3A; border-radius: 15px; color: #FFFFFF;}'
-            'QLabel{color: #FFFFFF; background-color: purple;}'
+            'QLabel{color: #FFFFFF;}'
             'QScrollBar{background-color: #3A3A3A; width: 20px; border-radius: 15px; color:#FFFFFF;}'
-            'QTextEdit{background-color: #3A3A3A; border: 1px solid grey; color: #FFFFFF;}'
+            'QTextEdit, QLineEdit{background-color: #3A3A3A; border: 1px solid grey; color: #FFFFFF;}'
         )
-        self.video_ext = ['mp3', 'mp4', 'webm', 'mkv']  # should make a param in config file
+        self.video_ext = ['mp3', 'mp4', 'webm', 'mkv', 'wmv', 'avi', 'mov', 'flv']  # should make a param in config file
         self.area = QWidget(parent=self)
         self.area.setObjectName('area')
         self.file_area = QWidget(parent=self.area)
@@ -108,8 +108,9 @@ class ResultWidget(QWidget):
         self.result_display.viewport().setCursor(QCursor(Qt.ArrowCursor))
         self.result_display.append('Result')
         self.result_display.setAlignment(Qt.AlignCenter)
-        self.wer_input_area = QTextEdit(parent=self.result_area)
+        self.wer_input_area = QLineEdit(parent=self.result_area)
         self.wer_input_area.setPlaceholderText('Enter your original text')
+        self.wer_input_area.setValidator(QRegExpValidator(QRegExp("[A-Za-z ']*")))
         self.wer_input_area.textChanged.connect(self.update_wer)
         self.wer_display_area = QTextEdit(parent=self.result_area)
         self.wer_display_area.setReadOnly(True)
@@ -131,7 +132,7 @@ class ResultWidget(QWidget):
         self.wer_input_area.setText(self.current_obj.getWER())
 
     def update_wer(self):
-        self.current_obj.setWER(self.wer_input_area.toPlainText())
+        self.current_obj.setWER(self.wer_input_area.text().strip())
         original_text = self.current_obj.getWER()
         pred_text = self.current_obj.getResult()
         if len(original_text) > 0 and len(pred_text) > 0:
@@ -234,7 +235,6 @@ class FileIconResult(QPushButton):
             svg = QSvgRenderer('../assets/video_file_icon.svg')
         else:
             svg = QSvgRenderer('../assets/audio_file_icon.svg')
-        painter.fillRect(QRectF(0, 0, self.height(), self.height()), QColor('red'))
         svg_size = QSize(self.height() / 1.5, self.height() / 1.5)
         svg.render(painter, QRectF(self.height() / 2 - svg_size.width() / 2, self.height() / 2 - svg_size.height() / 2,
                                    svg_size.width(), svg_size.height()))
@@ -278,7 +278,6 @@ class FileIconResult(QPushButton):
             self.text_font = font
         painter.setFont(self.text_font)
         painter.setPen(QColor('#FFFFFF'))
-        painter.fillRect(text_rect, QColor('blue'))
         painter.drawText(text_rect, Qt.AlignCenter, text)
         painter.end()
 
@@ -322,8 +321,12 @@ class ExportWidget(QWidget):
             'word': ['docx'],
             'text': ['txt']
         }
-        file = QFileDialog.getSaveFileName(self, 'Save file', '',
-                                           f'{mode[0].upper() + mode[1:]} ({" ".join("*." + i for i in ext[mode])})')
+        file = QFileDialog.getSaveFileName(
+            self,
+            'Save file',
+            '',
+            f'{mode[0].upper() + mode[1:]} ({" ".join("*." + i for i in ext[mode])})'
+        )
         if file == ('', ''):
             return
         else:

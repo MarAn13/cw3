@@ -7,7 +7,7 @@ from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QElapsedTimer
 from PyQt5.QtGui import QImage, QCursor, QIcon, QPixmap
 from ui_utils import clear_widget, clear_layout, ms_to_time
 from utils import merge
-from responsive_svg import SvgWidgetAspect, CustomAudioSvgWidget
+from responsive_svg import SvgWidgetAspect, CustomAudioSvgWidget, ResponsiveIconButton
 import pyaudio
 import wave
 import cv2 as cv
@@ -71,6 +71,8 @@ class VideoProcess(QObject):
     def __init__(self, output):
         super().__init__()
         self.cam = cv.VideoCapture(0)
+        self.cam.set(3, 1200)
+        self.cam.set(4, 1200)
         self.cam_state = True
         self.recorder = None
         self.recorder_state = False
@@ -89,12 +91,11 @@ class VideoProcess(QObject):
                 if self.recorder_state:
                     self.recorder.write(frame)
         self.cam.release()
-        # cv.destroyAllWindows()
+        cv.destroyAllWindows()
         self.finished.emit()
         print('video thread done')
 
     def toggle_record(self):
-        print('toggle_record_video')
         if self.recorder is None:
             self.recorder = cv.VideoWriter(self.output, cv.VideoWriter_fourcc('m', 'p', '4', 'v'), 30,
                                            (int(self.cam.get(3)), int(self.cam.get(4))))
@@ -193,14 +194,15 @@ class RecordWidget(QWidget):
         self.area.setProperty('cssClass', None)
         self.area.setStyleSheet(self.styleSheet())
         self.record_timer_text.setVisible(True)
-        self.record_toggle_button = QPushButton(parent=self.area)
-        self.record_toggle_button.setIcon(QIcon(QPixmap('../assets/video_record_red.svg')))
+        self.record_toggle_button = ResponsiveIconButton('../assets/video_record_red.svg', parent=self.area)
+        self.record_toggle_button.setBorderColor('transparent')
         self.record_toggle_button.clicked.connect(self.start_record)
         self.record_toggle_button.setCursor(QCursor(Qt.PointingHandCursor))
         self.record_toggle_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        self.area_layout.addWidget(self.record_timer_text, 0, 0, 0, 1, Qt.AlignCenter)
-        self.area_layout.addWidget(self.viewfinder, 0, 1, 0, 2, Qt.AlignCenter)
-        self.area_layout.addWidget(self.record_toggle_button, 0, 3, 0, 1, Qt.AlignCenter)
+        self.viewfinder.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.area_layout.addWidget(self.record_timer_text, 1, 0, 1, 1)
+        self.area_layout.addWidget(self.viewfinder, 0, 1, 3, 4)
+        self.area_layout.addWidget(self.record_toggle_button, 1, 5, 1, 1)
         self.area.setLayout(self.area_layout)
         if self.worker_video is None:
             self.worker_video = VideoProcess('temp/record_video.mp4')
@@ -226,7 +228,6 @@ class RecordWidget(QWidget):
         self.start_record()
 
     def start_record(self):
-        print('start_record')
         if self.record_type == 'video':
             self.record_toggle_button.setIcon(self.style().standardIcon(QStyle.SP_MediaStop))
             self.record_toggle_button.disconnect()
@@ -242,7 +243,7 @@ class RecordWidget(QWidget):
             self.worker_audio.moveToThread(self.thread_audio)
             self.thread_audio.started.connect(self.worker_audio.record)
             self.worker_audio.finished.connect(self.thread_audio.quit)  # is not working properly
-            self.worker_audio.finished.connect(self.worker_audio.deleteLater)  # is not working properly
+            # self.worker_audio.finished.connect(self.worker_audio.deleteLater)  # is not working properly
         if self.record_type == 'video':
             self.toggle_record_video()
         self.toggle_record_audio()
@@ -254,7 +255,6 @@ class RecordWidget(QWidget):
         self.record_repeater.start(100)
 
     def stop_record(self):
-        print('stop_record')
         self.record_timer.restart()
         self.record_repeater.stop()
         if self.record_type == 'audio':
@@ -284,7 +284,6 @@ class RecordWidget(QWidget):
     def toggle_record_audio(self):
         self.worker_audio.toggle_record()
         if not self.thread_audio.isRunning():
-            print('start audio thread')
             self.thread_audio.start()
 
     def toggle_record_video(self):
@@ -301,7 +300,7 @@ class RecordWidget(QWidget):
         self.record_toggle_button.update()
 
     def update_pixmap(self, img):
-        self.viewfinder.setPixmap(QPixmap.fromImage(img))
+        self.viewfinder.setPixmap(QPixmap.fromImage(img).scaled(self.viewfinder.width(), self.viewfinder.height(), Qt.KeepAspectRatio))
 
     def update_time(self):
         if self.record_type == 'video':

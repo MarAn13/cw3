@@ -121,20 +121,12 @@ def split(filepath, overwrite=False):
     outputs = []
     for i, chunk in enumerate(processed_chunks):
         stream = None
-        # stream_audio = None
-        # stream_video = None
         for start, stop in chunk:
             temp_stream = ffmpeg.input(filepath, ss=start, to=stop)
             if stream is None:
-                # stream = True
-                # stream_video = temp_stream.video
-                # stream_audio = temp_stream.audio
                 stream = temp_stream
             else:
-                # stream_video = ffmpeg.concat(stream_video, temp_stream.video, v=1, a=0)
-                # stream_audio = ffmpeg.concat(stream_audio, temp_stream.audio, v=0, a=1)
                 stream = ffmpeg.concat(temp_stream)
-        # stream = ffmpeg.concat(stream_video, stream_audio, v=1, a=1)
         output = f'{"".join(filepath.split(".")[:-1])}_chunk_{i}.mp4'
         stream = ffmpeg.output(stream, output)
         ffmpeg.run(stream, overwrite_output=True, quiet=True)
@@ -270,7 +262,7 @@ if __name__ == '__main__':
     # print('audio_video',
     #       predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'],
     #               'audio-video'))
-    # print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'], 'audio-video'))
-    print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-only\test2.mp4'], 'audio-only'))
+    print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'], 'audio-video'))
+    # print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-only\test2.mp4'], 'audio-only'))
     # print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\video-only\test5.mp4']))
     print('done')

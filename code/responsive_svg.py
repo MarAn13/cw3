@@ -93,12 +93,22 @@ class ResponsiveIconButton(QPushButton):
     def __init__(self, svg_path, parent=None):
         super().__init__(parent=parent)
         self.filepath = svg_path
+        self.brush_color = QColor('#252525')
         self.border_color = 'transparent'
         self.border_state = True
         self.resize(self.width(), self.height())
 
+    def setSVG(self, filepath):
+        self.filepath = filepath
+        self.update()
+
+    def setBrushColor(self, color):
+        self.brush_color = QColor(color)
+        self.update()
+
     def setBorderColor(self, color):
         self.border_color = color
+        self.update()
 
     def setBorderState(self, state):
         self.border_state = state
@@ -110,7 +120,7 @@ class ResponsiveIconButton(QPushButton):
         if option.state & QStyle.State_MouseOver or not self.border_state:
             brush_color = QColor('#323232')
         else:
-            brush_color = QColor('#252525')
+            brush_color = self.brush_color
         painter = QPainter()
         painter.begin(self)
         painter.setRenderHint(QPainter.HighQualityAntialiasing)

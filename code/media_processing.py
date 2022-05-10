@@ -10,7 +10,7 @@ from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 from ui_utils import ms_to_time, resize_font, clear_widget
 from utils import check_streams
-from responsive_svg import SvgWidgetAspect
+from responsive_svg import SvgWidgetAspect, ResponsiveIconButton
 from result_processing import ResultWidget, ResultProcess, LoadingScreen
 import os
 
@@ -56,9 +56,8 @@ class MediaPlayerWidget(QWidget):
         super().__init__(parent=parent)
         self.setStyleSheet(
             '#area{background-color: #292929; border-radius: 15px}'
-            'QLabel{color: #FFFFFF; background-color: red;}'
-            'QPushButton{background: yellow;}'
-            '#media_seek{margin: 0px; background: purple;}'
+            'QLabel{color: #FFFFFF;}'
+            '#media_seek{margin: 0px;}'
             '#media_seek::groove:horizontal{border-radius: 5px; height: 18px; margin: 20px 0px 20px 0px; background-color: silver;}'
             '#media_seek::handle:horizontal{border: 3px solid black; height: 20px; width: 20px; margin: -14px 0; border-radius: 5px; background-color: green;}'
             '#media_seek::sub-page:horizontal{border-radius: 5px; margin: 20px 0px 20px 0px; background-color: green;}'
@@ -66,26 +65,26 @@ class MediaPlayerWidget(QWidget):
             '#media_volume::groove:vertical{width: 18px; background: qlineargradient(x1:0.5, y1:0, x2:0.5, y2:0.25, x3:0.5, y3:1 stop:0 red, stop:0.25 yellow, stop:1 green);}'
             '#media_volume::handle:vertical{height: 10px; background: black}'
             '#media_volume::sub-page:vertical{background: silver;}'
+            'QPushButton{background-color: transparent;}'
         )
         self.setFocus()
         self.setFocusPolicy(Qt.StrongFocus)
         self.area = QWidget(parent=self)
         self.area.setObjectName('area')
         self.area_layout = QGridLayout()
-        # self.process_widget = ProcessWidget(file, False, parent=self.parent())
         self.process_widget = self.parent().parent().render_process_widget(file, False)
         self.media_player = QMediaPlayer(flags=QMediaPlayer.VideoSurface, parent=self)
         self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file)))
         self.value_change_loop_control = True
         self.media_player_widget = QVideoWidget(parent=self.area)
-        self.control_button_play = QPushButton(parent=self.area)
+        self.control_button_play = ResponsiveIconButton('../assets/media_play.svg', parent=self.area)
+        self.control_button_play.setBrushColor('transparent')
         self.control_button_play.setFocusPolicy(Qt.NoFocus)
-        self.control_button_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
         self.control_button_play.setCursor(QCursor(Qt.PointingHandCursor))
         self.control_button_play.clicked.connect(self.toggle_play)
-        self.control_button_stop = QPushButton(parent=self.area)
+        self.control_button_stop = ResponsiveIconButton('../assets/media_stop.svg', parent=self.area)
+        self.control_button_stop.setBrushColor('transparent')
         self.control_button_stop.setFocusPolicy(Qt.NoFocus)
-        self.control_button_stop.setIcon(self.style().standardIcon(QStyle.SP_MediaStop))
         self.control_button_stop.setCursor(QCursor(Qt.PointingHandCursor))
         self.control_button_stop.clicked.connect(self.stop)
         self.control_button_mute = QPushButton(parent=self.area)
@@ -153,9 +152,9 @@ class MediaPlayerWidget(QWidget):
 
     def media_player_state_changed(self):
         if self.media_player.state() == QMediaPlayer.PlayingState:
-            self.control_button_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPause))
+            self.control_button_play.setSVG('../assets/media_pause.svg')
         else:
-            self.control_button_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+            self.control_button_play.setSVG('../assets/media_play.svg')
 
     def media_player_position_changed(self, position):
         self.value_change_loop_control = False
@@ -216,10 +215,6 @@ class MediaPlayerWidget(QWidget):
     def resizeEvent(self, e):
         self.area.setFixedSize(self.width(), self.height())
 
-    # def showEvent(self, e):
-    #     self.show()
-    #     self.process_widget.show()
-
 
 class ProcessWidget(QWidget):
     def __init__(self, files, file_process, parent=None):
@@ -227,10 +222,10 @@ class ProcessWidget(QWidget):
         self.setStyleSheet(
             '#area{background-color: #2D2D2D; border-radius: 15px;}'
             'QPushButton{color: #50C878;background-color: #303933;border: 1px solid #3E3E3E;border-radius: 15px;}'
-            'QRadioButton{color: #FFFFFF; background-color: blue;}'
+            'QRadioButton{color: #FFFFFF;}'
             'QRadioButton::indicator{width: 10px; height: 10px; background-color: #FFFFFF;}'
             'QRadioButton::indicator::checked{image: url(../assets/radio_button_indicator.svg);}'
-            'QRadioButton[cssClass~=disabled]{color: grey; background-color: yellow;}'
+            'QRadioButton[cssClass~=disabled]{color: grey;}'
             'QRadioButton::indicator[cssClass~=disabled]{background-color: grey;}'
         )
         # self.setGeometry(345, 820, 600, 150)
@@ -266,14 +261,14 @@ class ProcessWidget(QWidget):
             self.radio_area = QLabel(parent=self.area)
             self.radio_area_layout = QVBoxLayout()
             self.radio_button_preferred = QRadioButton('preferred', parent=self.radio_area)
-            self.radio_button_preferred.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.radio_button_preferred.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
             self.radio_button_preferred.setChecked(True)
             self.radio_button_audio_only = QRadioButton('audio-only', parent=self.radio_area)
-            self.radio_button_audio_only.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.radio_button_audio_only.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
             self.radio_button_video_only = QRadioButton('video-only', parent=self.radio_area)
-            self.radio_button_video_only.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.radio_button_video_only.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
             self.radio_button_audio_video = QRadioButton('audio-video', parent=self.radio_area)
-            self.radio_button_audio_video.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.radio_button_audio_video.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
             self.radio_area_layout.addWidget(self.radio_button_preferred)
             self.radio_area_layout.addWidget(self.radio_button_audio_only)
             self.radio_area_layout.addWidget(self.radio_button_video_only)
@@ -344,14 +339,12 @@ class ProcessWidget(QWidget):
             record_widget.render_default()
 
     def process(self):
-        print('process')
         parent = self.parent().parent()
         if parent.screen_widgets['media_widget']:
             parent.screen_widgets['media_widget'].setVisible(False)
         if parent.screen_widgets['file_upload_widget']:
             parent.screen_widgets['file_upload_widget'].setVisible(False)
         self.setVisible(False)
-        # clear_widget(self.parent())
         parent.render_loading_screen()
         for files, mode in [[self.audio_only, 'audio-only'], [self.video_only, 'video-only'],
                             [self.audio_video, 'audio-video']]:
@@ -402,6 +395,7 @@ class ProcessWidget(QWidget):
                 font, step = resize_font(i)
                 if font.pointSize() < min_font.pointSize():
                     min_font = font
+            min_font.setPointSize(min_font.pointSize() - 1)
             for i in [self.radio_button_preferred, self.radio_button_audio_only, self.radio_button_video_only,
                       self.radio_button_audio_video]:
                 i.setFont(min_font)
