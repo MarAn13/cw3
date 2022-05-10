@@ -19,4 +19,5 @@
     place pre-trained weights of AO, VO, AV models in 'code/other/deep_avsr/../final/models' directory for the corresponding NN model
     place visual frontend and language model in 'code/other/weights/' named visual_frontend.pt and language_model.pt
 
+## Codecs [KLite Codecs](https://codecguide.com/download_kl.htm) and [GStreamer](https://gstreamer.freedesktop.org/) are needed for multimedia to function on Windows and Linux platforms, respectively
 ## Launch application via code/main.py file
