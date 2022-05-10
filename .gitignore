@@ -143,4 +143,5 @@ other/demo/
 *.pt
 *.mp4
 *.wav
-temp.*
+temp.npy
+temp.png
