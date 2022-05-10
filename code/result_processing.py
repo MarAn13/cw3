@@ -349,6 +349,8 @@ class ExportWidget(QWidget):
             with open(file, 'w') as f:
                 max_width = max(len(file[0]) for file in self.data)
                 for file, original, pred, wer in self.data:
+                    if wer is None:
+                        wer = ''
                     f.write(f'{file.ljust(max_width + 1) + " | " + original + " | " + pred + " | " + wer}\n')
 
     def resizeEvent(self, e):
