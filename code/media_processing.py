@@ -67,6 +67,7 @@ class MediaPlayerWidget(QWidget):
             '#media_volume::sub-page:vertical{background: silver;}'
             'QPushButton{background-color: transparent;}'
         )
+        print('media widget construct')
         self.setFocus()
         self.setFocusPolicy(Qt.StrongFocus)
         self.area = QWidget(parent=self)
