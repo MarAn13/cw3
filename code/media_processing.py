@@ -33,7 +33,6 @@ class MediaSlider(QSlider):
                 move_pos = pos / self.height()
                 move_pos = self.maximum() * move_pos
             self.setValue(move_pos)
-            self.timer.restart()
             self.timer.start()
 
     def mouseMoveEvent(self, e):
@@ -47,7 +46,6 @@ class MediaSlider(QSlider):
                 move_pos = pos / self.height()
                 move_pos = self.maximum() * move_pos
             self.setValue(move_pos)
-            self.timer.restart()
             self.timer.start()
 
 
@@ -67,7 +65,6 @@ class MediaPlayerWidget(QWidget):
             '#media_volume::sub-page:vertical{background: silver;}'
             'QPushButton{background-color: transparent;}'
         )
-        print('media widget construct')
         self.setFocus()
         self.setFocusPolicy(Qt.StrongFocus)
         self.area = QWidget(parent=self)

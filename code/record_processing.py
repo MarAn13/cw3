@@ -41,34 +41,25 @@ class AudioProcess(QObject):
         self.mic_options_sample_format = pyaudio.paInt16  # 16 bits per sample
         self.mic_options_channels = 1
         self.mic_options_rate = 16000
-        self.output = output
-
-    def run(self):
-        stream = self.mic.open(
+        self.stream = self.mic.open(
             format=self.mic_options_sample_format,
             channels=self.mic_options_channels,
             rate=self.mic_options_rate,
             frames_per_buffer=self.mic_options_chunk,
             input=True
         )
+        self.output = output
+
+    def run(self):
         frames = []
-        check = False
         while self.mic_state:
-            if not check:
-                from datetime import datetime
-                now = datetime.now()
-
-                current_time = now.strftime("%H:%M:%S")
-
-                print('audio', "Current Time is :", current_time)
-                check = True
-            data = stream.read(self.mic_options_chunk)
+            data = self.stream.read(self.mic_options_chunk)
             frames.append(data)
-        stream.stop_stream()
-        stream.close()
+        self.stream.stop_stream()
+        self.stream.close()
         self.mic.terminate()
         print('audio', len(frames),
-              self.mic_options_rate / self.mic_options_chunk * len(frames) / self.mic_options_chunk)
+              len(frames) * self.mic_options_chunk / self.mic_options_rate)
         with wave.open(self.output, 'wb') as wf:
             wf.setnchannels(self.mic_options_channels)
             wf.setsampwidth(self.mic.get_sample_size(self.mic_options_sample_format))
@@ -99,17 +90,16 @@ class VideoProcess(QObject):
         self.cam = cv.VideoCapture(0)
         self.cam.set(3, 1200)
         self.cam.set(4, 1200)
-        self.fps = 30
-        self.cam.set(cv.CAP_PROP_FPS, self.fps)
         self.cam_state = True
         self.recorder_state = False
         self.mutex = mutex
         self.cond = cond
+        self.timer = QElapsedTimer()
+        self.duration = 0
         self.output = output
 
     def run(self):
         frames = []
-        check = False
         while self.cam_state:
             ret, frame = self.cam.read()
             if ret:
@@ -121,17 +111,10 @@ class VideoProcess(QObject):
                 self.progress.emit(img)
                 self.cond.wait(self.mutex)
                 if self.recorder_state:
-                    if not check:
-                        from datetime import datetime
-                        now = datetime.now()
-
-                        current_time = now.strftime("%H:%M:%S")
-
-                        print('video', "Current Time is :", current_time)
-                        check = True
                     frames.append(frame)
-        print('video', len(frames), len(frames) / self.fps)
-        recorder = cv.VideoWriter(self.output, cv.VideoWriter_fourcc('m', 'p', '4', 'v'), self.fps,
+        fps = len(frames) / (self.duration / 1000)
+        print('video', len(frames), len(frames) / fps, fps)
+        recorder = cv.VideoWriter(self.output, cv.VideoWriter_fourcc('m', 'p', '4', 'v'), fps,
                                   (int(self.cam.get(3)), int(self.cam.get(4))))
         if self.cam.isOpened():
             self.cam.release()
@@ -143,9 +126,11 @@ class VideoProcess(QObject):
     def toggle_record(self):
         print('toggle_record_video')
         if self.recorder_state:
+            self.duration = self.timer.elapsed()
             self.recorder_state = False
             self.cam_state = False
         else:
+            self.timer.start()
             self.recorder_state = True
 
     def get_output(self):
@@ -294,7 +279,6 @@ class RecordWidget(QWidget):
         self.record_repeater.start(100)
 
     def stop_record(self):
-        self.record_timer.restart()
         self.record_repeater.stop()
         if self.record_type == 'audio':
             self.timer_audio.stop()
