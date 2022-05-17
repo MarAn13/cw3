@@ -53,15 +53,7 @@ def get_chunk_times_audio(filepath):
         silence_time = silence.detect_silence(audio,
                                               min_silence_len=params['MIN_SILENCE_LEN'],
                                               silence_thresh=dBFS + params['SILENCE_THRESHOLD'])
-        silence_time = [[(start / 1000), (stop / 1000)] for start, stop in silence_time]  # ms to seconds
-        silence_chunks = []
-        for start, stop in silence_time:
-            start_with_silence = start + params['SILENCE_BUFFER']
-            stop_with_silence = stop - params['SILENCE_BUFFER']
-            if start_with_silence < stop_with_silence:
-                start = start_with_silence
-                stop = stop_with_silence
-            silence_chunks.append([start, stop])
+        silence_chunks = [[(start / 1000), (stop / 1000)] for start, stop in silence_time]  # ms to seconds
         chunks_without_silence = []
         current_time = 0
         for start, stop in silence_chunks:
@@ -82,7 +74,7 @@ def get_chunk_times_audio(filepath):
                     if len(chunk) == 0:
                         processed_chunks.append([[chunk_start, chunk_start + current_chunk + (params['MIN_SPLIT_LEN'] - current_chunk)]])
                     else:
-                        chunk.append([chunk_start, chunk_start + current_chunk + (params['MIN_SPLIT_LEN'] - current_chunk)])
+                        chunk.append([chunk_start, chunk_start + (params['MIN_SPLIT_LEN'] - current_chunk)])
                         processed_chunks.append(chunk)
                         chunk = []
                     start += (params['MIN_SPLIT_LEN'] - current_chunk)
@@ -132,7 +124,7 @@ def split(filepath, overwrite=False):
             if stream is None:
                 stream = temp_stream
             else:
-                stream = ffmpeg.concat(stream, temp_stream)
+                stream = ffmpeg.concat(stream, temp_stream, a=1, v=1)
         output = f'temp/temp_chunk_{i}.mp4'
         stream = ffmpeg.output(stream, output)
         ffmpeg.run(stream, overwrite_output=True, quiet=True)
