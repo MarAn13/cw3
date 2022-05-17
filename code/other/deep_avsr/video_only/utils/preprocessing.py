@@ -40,6 +40,8 @@ def preprocess_sample(input, output, params):
             grayed = cv.resize(grayed, (224,224))
             roi = grayed[int(112-(roiSize/2)):int(112+(roiSize/2)), int(112-(roiSize/2)):int(112+(roiSize/2))]
             roiSequence.append(roi)
+            # cv.imshow('test', roi)
+            # cv.waitKey(100)
         else:
             break
     captureObj.release()

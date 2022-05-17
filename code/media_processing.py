@@ -344,8 +344,22 @@ class ProcessWidget(QWidget):
             parent.screen_widgets['file_upload_widget'].setVisible(False)
         self.setVisible(False)
         parent.render_loading_screen()
-        for files, mode in [[self.audio_only, 'audio-only'], [self.video_only, 'video-only'],
-                            [self.audio_video, 'audio-video']]:
+        if self.radio_button_preferred.isChecked():
+            raw_files = [[self.audio_only, 'audio-only'], [self.video_only, 'video-only'],
+                         [self.audio_video, 'audio-video']]
+        elif self.radio_button_audio_only.isChecked():
+            raw_files = [[self.audio_only + self.audio_video, 'audio-only']]
+            self.result['video-only'] = []
+            self.result['audio-video'] = []
+        elif self.radio_button_video_only.isChecked():
+            raw_files = [[self.video_only + self.audio_video, 'video-only']]
+            self.result['audio-only'] = []
+            self.result['audio-video'] = []
+        else:
+            raw_files = [[self.audio_video, 'audio-video']]
+            self.result['audio-only'] = []
+            self.result['video-only'] = []
+        for files, mode in raw_files:
             print(files, mode)
             if len(files) > 0:
                 thread = parent.create_thread()

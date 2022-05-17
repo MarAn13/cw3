@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 from pydub import AudioSegment
 import torch.tensor
 import os
+import numpy as np
 from other.deep_avsr.audio_only.util import predict as pred_audio_only
 from other.deep_avsr.video_only.util import predict as pred_video_only
 from other.deep_avsr.audio_visual.util import predict as pred_audio_video
@@ -121,13 +122,15 @@ def split(filepath, overwrite=False):
     outputs = []
     for i, chunk in enumerate(processed_chunks):
         stream = None
+        if np.sum([i[1] - i[0] for i in chunk]) < 1:
+            continue
         for start, stop in chunk:
             temp_stream = ffmpeg.input(filepath, ss=start, to=stop)
             if stream is None:
                 stream = temp_stream
             else:
                 stream = ffmpeg.concat(temp_stream)
-        output = f'{"".join(filepath.split(".")[:-1])}_chunk_{i}.mp4'
+        output = f'temp/temp_chunk_{i}.mp4'
         stream = ffmpeg.output(stream, output)
         ffmpeg.run(stream, overwrite_output=True, quiet=True)
         outputs.append(output)
@@ -202,6 +205,14 @@ def merge(video, audio, output):
     ffmpeg.run(stream, overwrite_output=True, quiet=True)
 
 
+def get_audio(filepath, output):
+    stream_audio = ffmpeg.input(filepath).audio
+    stream = ffmpeg.output(stream_audio,
+                           output,
+                           f=params['OUTPUT_FORMAT'])
+    ffmpeg.run(stream, overwrite_output=True, quiet=True)
+
+
 def predict(files, mode):
     if mode == 'audio-only':
         pred = pred_audio_only(files)
@@ -217,7 +228,8 @@ def compute_wer(original, pred):
     original_batch_len = torch.tensor(len(original_batch), dtype=torch.int32)
     pred_batch = get_tensor_batch(pred.upper())
     pred_batch_len = torch.tensor(len(pred_batch), dtype=torch.int32)
-    wer = min(100, get_wer(pred_batch, original_batch, pred_batch_len, original_batch_len, args['CHAR_TO_INDEX'][' ']) * 100)
+    wer = min(100,
+              get_wer(pred_batch, original_batch, pred_batch_len, original_batch_len, args['CHAR_TO_INDEX'][' ']) * 100)
     return wer
 
 
@@ -262,8 +274,53 @@ if __name__ == '__main__':
     # print('audio_video',
     #       predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'],
     #               'audio-video'))
-    print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'], 'audio-video'))
+    # print(
+    #     process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'],
+    #                     'audio-video'))
     # print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-only\test2.mp4'], 'audio-only'))
     # print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\video-only\test5.mp4']))
     # process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\temp\record.mp4'], 'audio-video')
+    # print(process_convert([r'C:\Users\marem\Downloads\01-01-08-01-01-01-23_LU4qiu9L.mp4'], 'video-only', 0, 0.1))
+    # preds = []
+    # wers = []
+    # temp = []
+    # temp_means = []
+    # temp_stds = []
+    # for i in np.linspace(0, 1, 10):
+    #     for j in np.linspace(0.1, 1, 10):
+    #         temp.append([i, j])
+    # pred_pred = 0
+    # pred_count = 0
+    # skip = False
+    # last_mean = 0
+    # np.random.shuffle(temp)
+    # for temp_mean, temp_std in temp:
+    #     if skip:
+    #         if last_mean == temp_mean:
+    #             continue
+    #         else:
+    #             skip = False
+    #             pred_count = 0
+    #     pred = predict({r'C:\Users\marem\Downloads\01-01-08-01-01-01-23_LU4qiu9L.mp4': [r'C:\Users\marem\Downloads\01-01-08-01-01-01-23_LU4qiu9L.mp4']},
+    #                   'video-only', temp_mean, temp_std)[r'C:\Users\marem\Downloads\01-01-08-01-01-01-23_LU4qiu9L.mp4']
+    #     wer = compute_wer('kids are talking by the door', pred)
+    #     preds.append(pred)
+    #     wers.append(wer)
+    #     temp_means.append(temp_mean)
+    #     temp_stds.append(temp_std)
+    #     print(pred, wer, temp_mean, temp_std)
+    #     if pred == pred_pred:
+    #         pred_count += 1
+    #     else:
+    #         pred_count = 0
+    #     if pred_count > 4:
+    #         skip = True
+    #         last_mean = temp_mean
+    #     pred_pred = pred
+    # test_wer = [wers[0], 0]
+    # for i in range(len(wers)):
+    #     if wers[i] < test_wer[0]:
+    #         test_wer[0] = wers[i]
+    #         test_wer[1] = i
+    # print(preds[test_wer[1]], wers[test_wer[1]], temp_means[test_wer[1]], temp_stds[test_wer[1]])
     print('done')
