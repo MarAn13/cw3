@@ -16,7 +16,7 @@ params = {
     'SILENCE_THRESHOLD': -30,
     'MIN_SPLIT_LEN': 6,
     'OUTPUT_FORMAT': 'mp4',
-    'SILENCE_BUFFER': 250,
+    'SILENCE_BUFFER': 0.250,
     'VIDEO_WIDTH': '160',
     'VIDEO_HEIGHT': '160',
     'VIDEO_FPS': 25,
@@ -54,45 +54,48 @@ def get_chunk_times_audio(filepath):
                                               min_silence_len=params['MIN_SILENCE_LEN'],
                                               silence_thresh=dBFS + params['SILENCE_THRESHOLD'])
         silence_time = [[(start / 1000), (stop / 1000)] for start, stop in silence_time]  # ms to seconds
-        temp = []
+        silence_chunks = []
         for start, stop in silence_time:
             start_with_silence = start + params['SILENCE_BUFFER']
             stop_with_silence = stop - params['SILENCE_BUFFER']
             if start_with_silence < stop_with_silence:
                 start = start_with_silence
                 stop = stop_with_silence
-            temp.append([start, stop])
-        processed_time = []
+            silence_chunks.append([start, stop])
+        chunks_without_silence = []
         current_time = 0
-        for start, stop in temp:
-            temp_start = current_time
-            while start - temp_start > params['MIN_SPLIT_LEN']:
-                temp_stop = temp_start + params['MIN_SPLIT_LEN']
-                processed_time.append([temp_start, temp_stop])
-                temp_start = temp_stop
-            processed_time.append([current_time, start])
-            current_time = stop
-        temp_start = current_time
-        while duration - temp_start > params['MIN_SPLIT_LEN']:
-            temp_stop = temp_start + params['MIN_SPLIT_LEN']
-            processed_time.append([temp_start, temp_stop])
-            temp_start = temp_stop
-        processed_time.append([temp_start, duration])
+        for start, stop in silence_chunks:
+            if start - current_time >= 1:
+                chunks_without_silence.append([current_time, start + params['SILENCE_BUFFER']])
+            current_time = stop - params['SILENCE_BUFFER']
+        if duration - current_time >= 1:
+            chunks_without_silence.append([current_time, duration])
         processed_chunks = []
-        temp = []
-        chunk_duration = 0
-        for start, stop in processed_time:
-            temp_duration = stop - start
-            if chunk_duration + temp_duration < params['MIN_SPLIT_LEN']:
-                temp.append([start, stop])
-                chunk_duration += temp_duration
-            else:
-                if len(temp) == 0:
-                    temp = [[start, stop]]
-                processed_chunks.append(temp)
-                temp = []
-                chunk_duration = 0
-        processed_chunks.append(temp)
+        current_chunk = 0
+        chunk_start = None
+        chunk = []
+        for start, stop in chunks_without_silence:
+            while stop - start != 0:
+                if chunk_start is None:
+                    chunk_start = start
+                if current_chunk + (stop - start) > params['MIN_SPLIT_LEN']:
+                    if len(chunk) == 0:
+                        processed_chunks.append([[chunk_start, chunk_start + current_chunk + (params['MIN_SPLIT_LEN'] - current_chunk)]])
+                    else:
+                        chunk.append([chunk_start, chunk_start + current_chunk + (params['MIN_SPLIT_LEN'] - current_chunk)])
+                        processed_chunks.append(chunk)
+                        chunk = []
+                    start += (params['MIN_SPLIT_LEN'] - current_chunk)
+                    chunk_start = None
+                    current_chunk = 0
+                else:
+                    current_chunk += (stop - start)
+                    start = stop
+            if current_chunk != 0:
+                chunk.append([chunk_start, chunk_start + current_chunk])
+            chunk_start = None
+        if len(chunk) != 0:
+            processed_chunks.append(chunk)
     else:
         processed_chunks = [[[0, duration]]]
     return processed_chunks

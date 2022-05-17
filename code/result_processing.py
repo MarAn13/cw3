@@ -59,6 +59,7 @@ class ResultProcess(QObject):
         # preprocess - dictionary {file: [filepath, filepath]}
         preprocess = process_convert(self.files, self.mode)
         result = predict(preprocess, self.mode)
+        print(result)
         # return {file: result}
         self.finished.emit(result, self.mode)
 
