@@ -129,7 +129,7 @@ def split(filepath, overwrite=False):
             if stream is None:
                 stream = temp_stream
             else:
-                stream = ffmpeg.concat(temp_stream)
+                stream = ffmpeg.concat(stream, temp_stream)
         output = f'temp/temp_chunk_{i}.mp4'
         stream = ffmpeg.output(stream, output)
         ffmpeg.run(stream, overwrite_output=True, quiet=True)
@@ -180,7 +180,7 @@ def convert(filepath, mode, overwrite=False):
                                preset=params['PRESET']
                                )
     else:
-        stream = ffmpeg.output(stream.audio,
+        stream = ffmpeg.output(stream,
                                output,
                                f=params['OUTPUT_FORMAT'],
                                ac=params['AUDIO_CHANNELS'],
