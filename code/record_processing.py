@@ -68,7 +68,6 @@ class AudioProcess(QObject):
         self.finished.emit('audio')
 
     def toggle_record(self):
-        print('toggle_record_audio')
         if self.mic_state:
             self.mic_state = False
         else:
@@ -124,7 +123,6 @@ class VideoProcess(QObject):
         self.finished.emit('video')
 
     def toggle_record(self):
-        print('toggle_record_video')
         if self.recorder_state:
             self.duration = self.timer.elapsed()
             self.recorder_state = False

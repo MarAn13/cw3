@@ -141,6 +141,8 @@ cython_debug/
 # user defined
 other/demo/
 data
+*.ipynb
+*.json
 *.pt
 *.mp4
 *.wav
