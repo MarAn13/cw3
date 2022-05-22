@@ -5,14 +5,17 @@ from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QRadioButton, QSlider,
     QSizePolicy, QGraphicsOpacityEffect
 from PyQt5.Qt import Qt
 from PyQt5.QtCore import QElapsedTimer, QUrl
-from PyQt5.QtGui import QCursor
+from PyQt5.QtGui import QCursor, QColor
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
+import pyqtgraph as pg
 from ui_utils import ms_to_time, resize_font, clear_widget
 from utils import check_streams
 from responsive_svg import SvgWidgetAspect, ResponsiveIconButton
 from result_processing import ResultWidget, ResultProcess, LoadingScreen
 import os
+import numpy as np
+from scipy.io import wavfile
 
 
 class MediaSlider(QSlider):
@@ -50,7 +53,7 @@ class MediaSlider(QSlider):
 
 
 class MediaPlayerWidget(QWidget):
-    def __init__(self, file, parent=None):
+    def __init__(self, file, file_type='video', parent=None):
         super().__init__(parent=parent)
         self.setStyleSheet(
             '#area{background-color: #292929; border-radius: 15px}'
@@ -67,14 +70,22 @@ class MediaPlayerWidget(QWidget):
         )
         self.setFocus()
         self.setFocusPolicy(Qt.StrongFocus)
+        self.source = file
+        self.file_type = file_type
         self.area = QWidget(parent=self)
         self.area.setObjectName('area')
         self.area_layout = QGridLayout()
         self.process_widget = self.parent().parent().render_process_widget(file, False)
         self.media_player = QMediaPlayer(flags=QMediaPlayer.VideoSurface, parent=self)
+        self.media_player.setNotifyInterval(10)
         self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file)))
         self.value_change_loop_control = True
-        self.media_player_widget = QVideoWidget(parent=self.area)
+        if file_type == 'video':
+            self.media_player_widget = QVideoWidget(parent=self.area)
+            self.media_player.setVideoOutput(self.media_player_widget)
+        else:
+            self.media_player_widget = pg.PlotWidget(parent=self.area)
+            self.media_player_widget_line = pg.InfiniteLine(pen=pg.mkPen(color=QColor('green'), width=5))
         self.control_button_play = ResponsiveIconButton('../assets/media_play.svg', parent=self.area)
         self.control_button_play.setBrushColor('transparent')
         self.control_button_play.setFocusPolicy(Qt.NoFocus)
@@ -106,7 +117,6 @@ class MediaPlayerWidget(QWidget):
         self.media_elapsed_time.setAlignment(Qt.AlignCenter)
         self.media_remained_time = QLabel('Remained', parent=self.area)
         self.media_remained_time.setAlignment(Qt.AlignCenter)
-        self.media_player.setVideoOutput(self.media_player_widget)
         self.media_player.stateChanged.connect(self.media_player_state_changed)
         self.media_player.positionChanged.connect(self.media_player_position_changed)
         self.media_player.durationChanged.connect(self.media_player_duration_changed)
@@ -157,6 +167,10 @@ class MediaPlayerWidget(QWidget):
     def media_player_position_changed(self, position):
         self.value_change_loop_control = False
         self.media_slider.setValue(position)
+        if self.file_type == 'audio':
+            self.media_player_widget.removeItem(self.media_player_widget_line)
+            self.media_player_widget_line.setPos(position / 1000)
+            self.media_player_widget.addItem(self.media_player_widget_line)
 
     def media_player_duration_changed(self, duration):
         self.media_slider.setRange(0, duration)
@@ -165,6 +179,14 @@ class MediaPlayerWidget(QWidget):
         font, step = resize_font(self.media_remained_time)
         self.media_elapsed_time.setFont(font)
         self.media_remained_time.setFont(font)
+        if self.file_type == 'audio':
+            samplerate, data = wavfile.read(self.source)
+            x = np.linspace(0, duration / 1000, len(data))
+            self.media_player_widget.plot(x, data)
+            range = self.media_player_widget.getViewBox().viewRange()
+            self.media_player_widget.getViewBox().setLimits(xMin=range[0][0], xMax=range[0][1],
+                                         yMin=range[1][0], yMax=range[1][1])
+            self.media_player_widget.setBackground(QColor('#292929'))
 
     def media_slider_value_changed(self, val):
         if self.value_change_loop_control:
@@ -333,8 +355,6 @@ class ProcessWidget(QWidget):
         record_widget = parent.render_record(self.file_type)
         if self.file_type == 'video':
             record_widget.render_record_video()
-        else:
-            record_widget.render_default()
 
     def process(self):
         parent = self.parent().parent()
@@ -344,21 +364,26 @@ class ProcessWidget(QWidget):
             parent.screen_widgets['file_upload_widget'].setVisible(False)
         self.setVisible(False)
         parent.render_loading_screen()
-        if self.radio_button_preferred.isChecked():
-            raw_files = [[self.audio_only, 'audio-only'], [self.video_only, 'video-only'],
-                         [self.audio_video, 'audio-video']]
-        elif self.radio_button_audio_only.isChecked():
-            raw_files = [[self.audio_only + self.audio_video, 'audio-only']]
-            self.result['video-only'] = []
-            self.result['audio-video'] = []
-        elif self.radio_button_video_only.isChecked():
-            raw_files = [[self.video_only + self.audio_video, 'video-only']]
-            self.result['audio-only'] = []
-            self.result['audio-video'] = []
+        if self.file_type != 'audio':
+            if self.radio_button_preferred.isChecked():
+                raw_files = [[self.audio_only, 'audio-only'], [self.video_only, 'video-only'],
+                             [self.audio_video, 'audio-video']]
+            elif self.radio_button_audio_only.isChecked():
+                raw_files = [[self.audio_only + self.audio_video, 'audio-only']]
+                self.result['video-only'] = []
+                self.result['audio-video'] = []
+            elif self.radio_button_video_only.isChecked():
+                raw_files = [[self.video_only + self.audio_video, 'video-only']]
+                self.result['audio-only'] = []
+                self.result['audio-video'] = []
+            else:
+                raw_files = [[self.audio_video, 'audio-video']]
+                self.result['audio-only'] = []
+                self.result['video-only'] = []
         else:
-            raw_files = [[self.audio_video, 'audio-video']]
-            self.result['audio-only'] = []
+            raw_files = [[self.audio_only, 'audio-only']]
             self.result['video-only'] = []
+            self.result['audio-video'] = []
         for files, mode in raw_files:
             print(files, mode)
             if len(files) > 0:

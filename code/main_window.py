@@ -113,11 +113,11 @@ class MainWindow(QMainWindow):
         self.screen_widgets['record_widget'] = screen_record_video
         return screen_record_video
 
-    def render_media_process(self, output):
+    def render_media_process(self, output, file_type):
         clear_widget(self.screen)
         self.reset_screen_widgets()
         self.clear_thread()
-        screen_media = MediaPlayerWidget(output, parent=self.screen)
+        screen_media = MediaPlayerWidget(output, file_type, parent=self.screen)
         screen_media.setGeometry(128, 256, 1024, 512)
         screen_media.show()
         self.screen_widgets['media_widget'] = screen_media

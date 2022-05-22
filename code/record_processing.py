@@ -306,15 +306,17 @@ class RecordWidget(QWidget):
             self.worker_merge.finished.connect(self.preprocess_output)
             self.worker_merge.finished.connect(self.thread_merge.quit)
             self.thread_merge.start()
+        else:
+            self.preprocess_output(audio, True)
 
-    def preprocess_output(self, output):
-        if True:
+    def preprocess_output(self, output, save_file=False):
+        if save_file:
             dst_path = 'data/record_'
             index = 0
-            while os.path.exists(f'{dst_path + str(index)}.mp4'):
+            while os.path.exists(f"{dst_path + str(index)}.{output.split('.')[-1]}"):
                 index += 1
-            shutil.copyfile(output, f'{dst_path + str(index)}.mp4')
-        self.parent().parent().render_media_process(output)
+            shutil.copyfile(output, f"{dst_path + str(index)}.{output.split('.')[-1]}")
+        self.parent().parent().render_media_process(output, self.record_type)
 
     def update_svg_circle(self):
         current_offset = self.record_toggle_button.get_background_offset()
