@@ -31,6 +31,11 @@ params = {
 
 
 def check_streams(filepath):
+    """
+    checks for the presence of an audio and video channel
+    :param filepath (str): filepath
+    :return (bool): audio and video channel status
+    """
     check_video = False
     check_audio = False
     try:
@@ -46,13 +51,19 @@ def check_streams(filepath):
 
 
 def get_chunk_times_audio(filepath):
+    """
+    splits an audio file into chunks
+    :param filepath (str): filepath
+    :return list(list(list(float, float))): chunks
+    """
     audio = AudioSegment.from_file(filepath,
                                    params['INPUT_FORMAT'])
     duration = audio.duration_seconds
     if duration > params['MIN_SPLIT_LEN']:
         from pydub import silence
         dBFS = audio.dBFS
-        silence_time = silence.detect_silence(audio, min_silence_len=params['MIN_SILENCE_LEN'], silence_thresh=dBFS + params['SILENCE_THRESHOLD'])
+        silence_time = silence.detect_silence(audio, min_silence_len=params['MIN_SILENCE_LEN'],
+                                              silence_thresh=dBFS + params['SILENCE_THRESHOLD'])
         silence_chunks = [[(start / 1000), (stop / 1000)] for start, stop in silence_time]  # ms to seconds
         chunks_without_silence = []
         current_time = 0
@@ -95,6 +106,11 @@ def get_chunk_times_audio(filepath):
 
 
 def get_chunk_times_video(filepath):
+    """
+    splits a video file into chunks
+    :param filepath (str): filepath
+    :return list(list(list(float, float))): chunks
+    """
     duration = float((ffmpeg.probe(filepath)['streams'][0]['duration']))
     if duration > params['MIN_SPLIT_LEN']:
         processed_chunks = []
@@ -110,6 +126,12 @@ def get_chunk_times_video(filepath):
 
 
 def split(filepath, overwrite=False):
+    """
+    split file driver
+    :param filepath (str): filepath
+    :param overwrite (bool): whether to delete original file
+    :return list(str): output filepaths
+    """
     check_audio, check_video = check_streams(filepath)
     if not check_audio:
         processed_chunks = get_chunk_times_video(filepath)
@@ -141,6 +163,13 @@ def split(filepath, overwrite=False):
 
 
 def convert(filepath, mode, overwrite=False):
+    """
+    converting the file to the appropriate format
+    :param filepath (str): filepath
+    :param mode (str): conversion type
+    :param overwrite (bool): whether to delete original file
+    :return (str): output filepath
+    """
     check_audio, check_video = check_streams(filepath)
     output = filepath.split('.')
     output[-2] += '_output'
@@ -197,6 +226,13 @@ def convert(filepath, mode, overwrite=False):
 
 
 def merge(video, audio, output):
+    """
+    merges audio and video channels
+    :param video (str): video filepath
+    :param audio (str): audio filepath
+    :param output (str): output filepath
+    :return (str): output filepath
+    """
     stream_video = ffmpeg.input(video)
     stream_audio = ffmpeg.input(audio)
     stream = ffmpeg.concat(stream_video, stream_audio, v=1, a=1)
@@ -207,6 +243,12 @@ def merge(video, audio, output):
 
 
 def get_audio(filepath, output):
+    """
+    gets audio channel from file
+    :param filepath (str): filepath
+    :param output (str): output filepath
+    :return (void):
+    """
     stream_audio = ffmpeg.input(filepath).audio
     stream = ffmpeg.output(stream_audio,
                            output,
@@ -215,6 +257,12 @@ def get_audio(filepath, output):
 
 
 def predict(files, mode):
+    """
+    driver function for model prediction
+    :param files (list(str)): filepaths
+    :param mode (str): prediction mode
+    :return (dict(str:str)): prediction result
+    """
     if mode == 'audio-only':
         pred = pred_audio_only(files)
     elif mode == 'video-only':
@@ -225,6 +273,12 @@ def predict(files, mode):
 
 
 def compute_wer(original, pred):
+    """
+    driver function for WER computing
+    :param original (str): original text
+    :param pred (str): prediction
+    :return (float): WER result
+    """
     original_batch = get_tensor_batch(original.upper())
     original_batch_len = torch.tensor(len(original_batch), dtype=torch.int32)
     pred_batch = get_tensor_batch(pred.upper())
@@ -235,6 +289,11 @@ def compute_wer(original, pred):
 
 
 def get_tensor_batch(data):
+    """
+    converts data to tensor
+    :param data (str): data
+    :return (tensor): data tensor
+    """
     batch = [args['CHAR_TO_INDEX'][i] for i in data]
     batch.append(args['CHAR_TO_INDEX']['<EOS>'])
     batch = torch.tensor(batch, dtype=torch.int32)
@@ -242,6 +301,13 @@ def get_tensor_batch(data):
 
 
 def process_convert(files, mode, SNR=100):
+    """
+    driver for processing and converting of files
+    :param files (list(str)): filepaths
+    :param mode (str): convertion mode
+    :param SNR (float): SNR in dB
+    :return (dict(str:list(str)): convertion result
+    """
     result = dict()
     for file in files:
         result[file] = []
@@ -255,6 +321,12 @@ def process_convert(files, mode, SNR=100):
 
 
 def add_noise(signal, SNR):
+    """
+    adds noise to video data
+    :param signal (np.ndarray): original signal
+    :param SNR (float): SNR in dB
+    :return (np.ndarray): resulting output
+    """
     if SNR >= 100:
         return signal
     noise = np.ndarray(signal.shape, np.uint8)
@@ -266,6 +338,12 @@ def add_noise(signal, SNR):
 
 
 def add_video_noise(filepath, SNR):
+    """
+    video noise driver
+    :param filepath (str): filepath
+    :param SNR (float): SNR in dB
+    :return (str): output filepath
+    """
     if SNR >= 100:
         return filepath
     output = filepath.split('.')
@@ -305,6 +383,11 @@ def add_video_noise(filepath, SNR):
 
 
 def generate_audio_noise(dir_path):
+    """
+    generates audio noise
+    :param dir_path (str): path to directory with data
+    :return (void):
+    """
     from scipy.io import wavfile
     files = [os.path.abspath(dir_path + '/' + file) for file in os.listdir(dir_path)]
     noise = np.empty((0))
@@ -326,7 +409,62 @@ def generate_audio_noise(dir_path):
     wavfile.write(dir_path + "/noise.wav", 16000, noise)
 
 
-def change_file(mode, param, param_val):
+def get_from_file(file, param):
+    """
+        gets the value of the specified parameter in the provided file
+        :param file (str): filepath
+        :param param (str): file parameter
+        :return (dict(str:str)): param value
+    """
+    search_string = str(param)
+    result = dict()
+    with open(file) as f:
+        file_content = f.readlines()
+        for line in file_content:
+            if search_string in line:
+                temp = line.split(':')
+                result[temp[0].strip()] = temp[1].strip()
+    return result
+
+
+def change_file(file, param, param_val=None):
+    """
+    changes the value of the specified parameter in the provided file to the desired
+    :param file (str): filepath
+    :param param (str): file parameter
+    :param param_val (str): desired parameter value
+    :return (bool): whether a change has been made
+    """
+    status = False
+    search_string = str(param)
+    new_file_content = None
+    with open(file) as f:
+        file_content = f.readlines()
+        new_lines = []
+        for line in file_content:
+            if search_string in line:
+                status = True
+                comment_pos = line.find('#')
+                comment_str = ''
+                if comment_pos != -1:
+                    comment_str = line[comment_pos:]
+                line = search_string + f' : {param_val}  {comment_str}'
+            new_lines.append(line.strip())
+        new_file_content = '\n'.join(new_lines)
+    if new_file_content is not None:
+        with open(file, 'w') as f:
+            f.write(new_file_content)
+    return status
+
+
+def change_config_file(mode, param, param_val):
+    """
+    changes the value of the specified parameter in the provided file to the desired
+    :param mode (str): a string indicating the file type
+    :param param (str): file parameter
+    :param param_val (str): desired parameter value
+    :return (bool): whether a change has been made
+    """
     status = False
     if mode == 'audio-only':
         file = 'other/deep_avsr/audio_only/config.py'
@@ -370,145 +508,9 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
-    # print(compute_wer({'test': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELLO MY FRIEND NICE TO MEET YOU'],
-    #              'test1': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELYU MY FRIND NCE TO MEIT U'],
-    #              'test2': ['HELLO MY FRIEND NICE TO MEET YOU', 'HELLO FRIEND NECE TO MEET YOU']}))
-    # print('audio_only',
-    #       predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-only\test.mp4'],
-    #               'audio-only'))
-    # print('video_only',
-    #       predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\video-only\test5.mp4'],
-    #               'video-only'))
-    # print('audio_video',
-    #       predict([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'],
-    #               'audio-video'))
-    # print(
-    #     process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'],
-    #                     'audio-video'))
-    # print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-only\test2.mp4'], 'audio-only'))
-    # print(process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\video-only\test5.mp4']))
-    # process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\temp\record.mp4'], 'audio-video')
-    # print(process_convert([r'C:\Users\marem\Downloads\01-01-08-01-01-01-23_LU4qiu9L.mp4'], 'video-only', 0, 0.1))
-    # preds = []
-    # wers = []
-    # temp = []
-    # temp_means = []
-    # temp_stds = []
-    # for i in np.linspace(0, 1, 10):
-    #     for j in np.linspace(0.1, 1, 10):
-    #         temp.append([i, j])
-    # pred_pred = 0
-    # pred_count = 0
-    # skip = False
-    # last_mean = 0
-    # np.random.shuffle(temp)
-    # for temp_mean, temp_std in temp:
-    #     if skip:
-    #         if last_mean == temp_mean:
-    #             continue
-    #         else:
-    #             skip = False
-    #             pred_count = 0
-    #     pred = predict({r'C:\Users\marem\Downloads\01-01-08-01-01-01-23_LU4qiu9L.mp4': [r'C:\Users\marem\Downloads\01-01-08-01-01-01-23_LU4qiu9L.mp4']},
-    #                   'video-only', temp_mean, temp_std)[r'C:\Users\marem\Downloads\01-01-08-01-01-01-23_LU4qiu9L.mp4']
-    #     wer = compute_wer('kids are talking by the door', pred)
-    #     preds.append(pred)
-    #     wers.append(wer)
-    #     temp_means.append(temp_mean)
-    #     temp_stds.append(temp_std)
-    #     print(pred, wer, temp_mean, temp_std)
-    #     if pred == pred_pred:
-    #         pred_count += 1
-    #     else:
-    #         pred_count = 0
-    #     if pred_count > 4:
-    #         skip = True
-    #         last_mean = temp_mean
-    #     pred_pred = pred
-    # test_wer = [wers[0], 0]
-    # for i in range(len(wers)):
-    #     if wers[i] < test_wer[0]:
-    #         test_wer[0] = wers[i]
-    #         test_wer[1] = i
-    # print(preds[test_wer[1]], wers[test_wer[1]], temp_means[test_wer[1]], temp_stds[test_wer[1]])
-    # process_convert([
-    #                     r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\data_actors\actor_24_cropped\01-01-01-01-01-01-24.mp4',
-    #                     r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\data_actors\actor_24_cropped\01-01-08-02-02-01-24.mp4'],
-    #                 'video-only')
-    # files = [os.path.abspath('data_processed/' + file) for file in os.listdir('data_processed')]
-    # for file in files:
-    #     convert(file, 'audio-only')
-    # files = [os.path.abspath('data_processed/' + file) for file in os.listdir('data_processed')]
-    # for file in files:
-    #     if not file.split('.')[-2][-1] == 't':
-    #         os.unlink(file)
-    # files = [os.path.abspath('data_processed/' + file) for file in os.listdir('data_processed')]
-    # for file in files:
-    #     if file.split('.')[-1] == 'mp4':
-    #         os.unlink(file)
-    # generate_audio_noise('data_processed')
-    # import time
-    # start = time.time()
-    # process_convert([r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\other\demo\audio-video\test5.mp4'], 'audio-video', 50)
-    # # for i in range(0, 11):
-    # #     add_video_noise(r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\data_actors\01-01-01-01-01-01-01.mp4', i * 10)
-    # print(time.time() - start)
-    # def clear_dir(dir_path):
-    #     for file in os.listdir(dir_path):
-    #         os.unlink(dir_path + '/' + file)
-    #
-    #
-    # def predict1(video_SNR):
-    #     result = dict()
-    #     for mode in ['audio-only', 'video-only']:
-    #         preprocess = process_convert(
-    #             [r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\data_actors\01-01-01-01-01-01-01.mp4'],
-    #             mode, video_SNR)
-    #         pred = predict(preprocess, mode)
-    #         val = pred[
-    #             r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\data_actors\01-01-01-01-01-01-01.mp4']
-    #         wer = compute_wer('kids are talking by the door', val)
-    #         result[mode] = wer
-    #         clear_dir('temp')
-    #         print(wer)
-    #     return result
-    #
-    #
-    # def predict2(av_mode, video_SNR):
-    #     result = dict()
-    #     for mode in ['audio-video']:
-    #         preprocess = process_convert(
-    #             [r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\data_actors\01-01-01-01-01-01-01.mp4'],
-    #             mode, video_SNR)
-    #         pred = predict(preprocess, mode)
-    #         val = pred[
-    #             r'C:\Users\marem\PycharmProjects\home\projects\cw3\app\code\data_actors\01-01-01-01-01-01-01.mp4']
-    #         wer = compute_wer(
-    #             'kids are talking by the door', val)
-    #         print(wer)
-    #         result[av_mode] = wer
-    #     return result
-    #
-    #
-    # result = predict2('VO', 100)
-    # # result = predict2('AO', 100)
-    # import json
-    # # p2-AO
-    # # p2 - predict2
-    # # p1-f-g-100-100
-    # # p1 - predict1
-    # # f - lm
-    # # g - decoder
-    # # 100 - audio snr
-    # # 100 - video snr
-    # # with open('jsons/p1-f-g-0-100.json', 'w') as f:
-    # #     json.dump(result, f)
-    # print(change_file('audio-only', 'TEST_DEMO_NOISY', True)
-    data = []
-    for file in os.listdir('data'):
-        if file != 'noise.wav':
-            data.append(os.path.abspath('data' + '/' + file))
-    pred = predict(process_convert(data, 'video-only', 100), 'video-only')
-    print(pred)
+    print(change_file('config.txt', 'Resolution', '1024x120'))
+    print(change_file('config.txt', 'Decoder', 'search'))
+    print(change_file('config.txt', 'Audio SNR', '0'))
+    print(change_file('config.txt', 'Video SNR', '10'))
+    print(change_file('config.txt', 'Vide SNR', '10'))
     print('done')

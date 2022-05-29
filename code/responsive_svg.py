@@ -1,11 +1,12 @@
 """
 Classes with responsive icons
 """
-from PyQt5.QtWidgets import QPushButton, QStyle, QStyleOptionButton
+from PyQt5.QtWidgets import QComboBox, QPushButton, QStyle, QStyleOptionButton
 from PyQt5.Qt import Qt
-from PyQt5.QtCore import QRectF, QSize
-from PyQt5.QtGui import QPainter, QPainterPath, QPen, QColor, QLinearGradient
+from PyQt5.QtCore import QRectF, QSize, QSizeF, pyqtSignal
+from PyQt5.QtGui import QPainter, QPainterPath, QPen, QColor, QLinearGradient, QCursor
 from PyQt5.QtSvg import QSvgWidget, QSvgRenderer
+from ui_utils import resize_font
 
 
 class SvgWidgetAspect(QSvgWidget):
@@ -96,7 +97,6 @@ class ResponsiveIconButton(QPushButton):
         self.brush_color = QColor('#252525')
         self.border_color = 'transparent'
         self.border_state = True
-        self.resize(self.width(), self.height())
 
     def setSVG(self, filepath):
         self.filepath = filepath
@@ -148,3 +148,115 @@ class ResponsiveIconButton(QPushButton):
         else:
             e_point = e_height
         self.setFixedSize(e_point, e_point)
+
+
+class CustomComboBox(QComboBox):
+    changed_item = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.setMinimumHeight(230)
+        self.top_text = 'GUI'
+        self.text = 'HELLO'
+        self.box_area = None
+        self.items = []
+        self.params = {
+            'drop-down-menu': False,
+            'current-item': None,
+            'hover-item': None
+        }
+        self.setMouseTracking(True)
+
+    def contains(self, rect, e):
+        if rect.x() <= e.x() <= rect.x() + rect.width() and rect.y() <= e.y() <= rect.y() + rect.height():
+            return True
+        return False
+
+    def mouseMoveEvent(self, e):
+        self.setCursor(QCursor(Qt.PointingHandCursor))
+        if self.contains(self.box_area, e):
+            self.params['hover-item'] = -1
+        elif self.params['drop-down-menu']:
+            for i, item in enumerate(self.items):
+                if self.contains(item, e):
+                    self.params['hover-item'] = i
+                    break
+        else:
+            self.setCursor(QCursor(Qt.ArrowCursor))
+            self.params['hover-item'] = None
+        self.update()
+
+    def mousePressEvent(self, e):
+        if self.contains(self.box_area, e):
+            if self.params['drop-down-menu']:
+                self.params['drop-down-menu'] = False
+            else:
+                self.params['drop-down-menu'] = True
+        for i, item in enumerate(self.items):
+            if self.contains(item, e):
+                if self.params['current-item'] != i:
+                    self.changed_item.emit(self.itemText(i))
+                self.params['current-item'] = i
+                break
+        self.update()
+
+    def paintEvent(self, e):
+        painter = QPainter()
+        painter.begin(self)
+        box_size = QSizeF(self.width(), self.height() / 3)
+        top_text_geometry = QRectF(10, 0, self.width(), box_size.height() * 0.3)
+        font, step = resize_font(top_text_geometry, painter.font(), self.top_text)
+        font.setUnderline(True)
+        painter.setFont(font)
+        pen = painter.pen()
+        pen.setColor(QColor('#FFFFFF'))
+        painter.setPen(pen)
+        painter.drawText(top_text_geometry, self.top_text)
+        self.box_area = QRectF(0, top_text_geometry.height(), box_size.width(), box_size.height())
+        path = QPainterPath()
+        path.addRoundedRect(self.box_area, 15, 15)
+        if self.params['hover-item'] == -1:
+            color = QColor('#363636')
+        else:
+            color = QColor('#292929')
+        painter.fillPath(path, color)
+        svg = QSvgRenderer('../assets/combobox_arrow_down.svg')
+        svg_size = QSizeF(box_size.height() / 2, box_size.height() / 2)
+        svg_geometry = QRectF(box_size.width() - svg_size.width(),
+                              self.box_area.y() + box_size.height() - svg_size.height() - 15,
+                              svg_size.width(), svg_size.height())
+        svg.render(painter, svg_geometry)
+        text_size = QSizeF(box_size.width() - svg_size.width(), box_size.height() / 2)
+        font, step = resize_font(text_size, painter.font(), self.text)
+        font.setUnderline(False)
+        painter.setFont(font)
+        painter.drawText(QRectF(10, self.box_area.y() + box_size.height() - text_size.height() - 15, text_size.width(),
+                                text_size.height()),
+                         self.text)
+        if self.params['drop-down-menu']:
+            item_size = QSizeF(self.width(), (self.height() - box_size.height() - self.box_area.y()) / self.count())
+            font = painter.font()
+            font.setPointSize(font.pointSize() - 2)
+            self.items = []
+            for i in range(self.count()):
+                rect = QRectF(0, self.box_area.y() + box_size.height() - 15 + item_size.height() * i, item_size.width(),
+                              item_size.height())
+                if self.params['current-item'] == i:
+                    color = QColor('green')
+                elif self.params['hover-item'] == i:
+                    color = QColor('#363636')
+                else:
+                    color = QColor('#292929')
+                painter.fillRect(rect, color)
+                painter.drawRect(rect)
+                self.items.append(rect)
+                text = self.itemText(i)
+                rect_text = rect
+                rect_text.setX(rect_text.x() + 10)
+                rect_text.setY(rect_text.y() + (item_size.height() - text_size.height()) / 2)
+                painter.setFont(font)
+                painter.drawText(rect, text)
+        painter.end()
+
+    def resizeEvent(self, e):
+        print(e.size())

@@ -11,6 +11,7 @@ from file_upload_processing import FileUploadWidget
 from record_processing import RecordWidget
 from result_processing import ResultWidget, LoadingScreen, ExportWidget
 from media_processing import MediaPlayerWidget, ProcessWidget
+from utils import get_from_file
 
 
 class MainWindow(QMainWindow):
@@ -30,9 +31,11 @@ class MainWindow(QMainWindow):
             '#menu #audio_record{border-color: #DA70D6;}'
             '#screen{background: #1B1B1B;}'
         )
+        self.resolution = get_from_file('config.txt', 'Resolution')['Resolution'].split('x')
+        self.resolution = list(map(lambda i: int(str(i).strip()), self.resolution))
         self.menu = QWidget(parent=self)
         self.menu.setObjectName('menu')
-        self.menu.setGeometry(0, 0, 160, 1024)
+        self.menu.setGeometry(0, 0, self.width() / 9, self.height())
         menu_layout = QGridLayout()
         self.logo = SvgWidgetAspect('../assets/logo.svg', (1, 1), parent=self.menu)
         self.file_upload = ResponsiveIconButton('../assets/file_upload.svg', parent=self.menu)
@@ -52,6 +55,7 @@ class MainWindow(QMainWindow):
         self.audio_record.clicked.connect(lambda: self.toggle_active(self.audio_record))
         self.settings = ResponsiveIconButton('../assets/settings.svg', parent=self.menu)
         self.settings.setCursor(QCursor(Qt.PointingHandCursor))
+        self.settings.clicked.connect(self.render_settings)
         self.logo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.file_upload.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.video_record.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
@@ -65,7 +69,7 @@ class MainWindow(QMainWindow):
         self.menu.setLayout(menu_layout)
         self.screen = QWidget(parent=self)
         self.screen.setObjectName('screen')
-        self.screen.setGeometry(160, 0, 1280, 1024)
+        self.screen.setGeometry(self.menu.width(), 0, self.width() - self.menu.width(), self.height())
         self.screen_widgets = {
             'file_upload_widget': None,
             'record_widget': None,
@@ -76,6 +80,11 @@ class MainWindow(QMainWindow):
         }
         self.threads = []
         self.render_file_upload()
+
+    def change_resolution(self):
+        self.resolution = get_from_file('config.txt', 'Resolution')['Resolution'].split('x')
+        self.resolution = list(map(lambda i: int(str(i).strip()), self.resolution))
+        self.setFixedSize(self.resolution[0], self.resolution[1])
 
     def toggle_active(self, widget):
         for i in [self.file_upload, self.video_record, self.audio_record]:
@@ -97,7 +106,7 @@ class MainWindow(QMainWindow):
         clear_widget(self.screen)
         self.reset_screen_widgets()
         screen_file_upload = FileUploadWidget(parent=self.screen)
-        screen_file_upload.setGeometry(128, 256, 1024, 512)
+        screen_file_upload.setGeometry(int(self.screen.width() * 0.1), int(self.screen.height() * 0.25), int(self.screen.width() * 0.8), int(self.screen.height() * 0.5))
         screen_file_upload.show()
         self.screen_widgets['file_upload_widget'] = screen_file_upload
         return screen_file_upload
@@ -106,19 +115,31 @@ class MainWindow(QMainWindow):
         clear_widget(self.screen)
         self.reset_screen_widgets()
         self.clear_thread()
-        screen_record_video = RecordWidget(record_type, parent=self.screen)
-        screen_record_video.render_default()
-        screen_record_video.setGeometry(128, 256, 1024, 512)
-        screen_record_video.show()
-        self.screen_widgets['record_widget'] = screen_record_video
-        return screen_record_video
+        screen_record = RecordWidget(record_type, parent=self.screen)
+        screen_record.render_default()
+        screen_record.setGeometry(int(self.screen.width() * 0.1), int(self.screen.height() * 0.25), int(self.screen.width() * 0.8), int(self.screen.height() * 0.5))
+        screen_record.show()
+        self.screen_widgets['record_widget'] = screen_record
+        return screen_record
+
+    def render_settings(self):
+        clear_widget(self.screen)
+        self.reset_screen_widgets()
+        self.clear_thread()
+        from settings import SettingsWidget
+        screen_settings = SettingsWidget(parent=self.screen)
+        screen_settings.config_changed.connect(self.change_resolution)
+        screen_settings.setGeometry(0, 0, self.screen.width(), self.screen.height())
+        screen_settings.show()
+        self.screen_widgets['settings_widget'] = screen_settings
+        return screen_settings
 
     def render_media_process(self, output, file_type):
         clear_widget(self.screen)
         self.reset_screen_widgets()
         self.clear_thread()
         screen_media = MediaPlayerWidget(output, file_type, parent=self.screen)
-        screen_media.setGeometry(128, 256, 1024, 512)
+        screen_media.setGeometry(int(self.screen.width() * 0.1), int(self.screen.height() * 0.25), int(self.screen.width() * 0.8), int(self.screen.height() * 0.5))
         screen_media.show()
         self.screen_widgets['media_widget'] = screen_media
         return screen_media
@@ -135,7 +156,7 @@ class MainWindow(QMainWindow):
         # clear_widget(self.screen)
         # self.clear_thread()
         process = ProcessWidget(files, file_process, parent=self.screen)
-        process.setGeometry(345, 820, 600, 150)
+        process.setGeometry(int(self.screen.width() * 0.26953125), int(self.screen.height() * 0.80078125), int(self.screen.width() * 0.46875), int(self.screen.height() * 0.146484375))
         process.show()
         self.screen_widgets['process_widget'] = process
         return process
@@ -145,7 +166,7 @@ class MainWindow(QMainWindow):
         self.reset_screen_widgets()
         self.clear_thread()
         screen_result = ResultWidget(files, parent=self.screen)
-        screen_result.setGeometry(128, 256, 1024, 512)
+        screen_result.setGeometry(int(self.screen.width() * 0.1), int(self.screen.height() * 0.25), int(self.screen.width() * 0.8), int(self.screen.height() * 0.5))
         screen_result.show()
         self.screen_widgets['result_widget'] = screen_result
         return screen_result
@@ -154,7 +175,7 @@ class MainWindow(QMainWindow):
         # clear_widget(self.screen)
         # self.clear_thread()
         export = ExportWidget(files, parent=self.screen)
-        export.setGeometry(345, 820, 600, 150)
+        export.setGeometry(int(self.screen.width() * 0.26953125), int(self.screen.height() * 0.80078125), int(self.screen.width() * 0.46875), int(self.screen.height() * 0.146484375))
         export.show()
         self.screen_widgets['export_widget'] = export
         return export
@@ -167,6 +188,11 @@ class MainWindow(QMainWindow):
             'process_widget': None,
             'result_widget': None
         }
+
+    def resizeEvent(self, e):
+        self.setFixedSize(self.resolution[0], self.resolution[1])
+        self.menu.setGeometry(0, 0, self.width() / 9, self.height())
+        self.screen.setGeometry(self.menu.width(), 0, self.width() - self.menu.width(), self.height())
 
     def closeEvent(self, e):
         clear_widget(self)
