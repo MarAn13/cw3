@@ -12,7 +12,7 @@ from scipy.io import wavfile
 import numpy as np
 
 from config import args
-from utils.preprocessing import preprocess_sample
+from .utils.preprocessing import preprocess_sample
 
 
 
@@ -38,7 +38,10 @@ def main():
     print("\n\nStarting preprocessing ....\n")
 
     for file in tqdm(filesList, leave=True, desc="Preprocess", ncols=75):
-        preprocess_sample(file)
+        file_output = args['PRED_OUTPUT'] + 'temp.wav'
+        preprocess_sample(file, file_output)
+    print(filesList)
+    exit()
 
     print("\nPreprocessing Done.")
 

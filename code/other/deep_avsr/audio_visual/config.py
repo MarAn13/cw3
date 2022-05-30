@@ -12,7 +12,7 @@ current_dir = str(pathlib.Path(__file__).parent.resolve())
 # project structure
 args["CODE_DIRECTORY"] = current_dir + '\\final\\models\\'  # absolute path to the code directory
 args['PRED_OUTPUT'] = '\\'.join(current_dir.split('\\')[0:-3]) + '\\temp\\'
-args["DATA_DIRECTORY"] = None  # absolute path to the data directory
+args["DATA_DIRECTORY"] = '\\'.join(current_dir.split('\\')[0:-3]) + '\\data'  # absolute path to the data directory
 args["DEMO_DIRECTORY"] = None  #"C:/Users/marem/PycharmProjects/home/projects/cw3/app/code/other/demo/audio-video/"  # absolute path to the demo directory
 args["PRETRAINED_MODEL_FILE"] = "audio-visual.pt"  # relative path to the pretrained model file
 args["TRAINED_MODEL_FILE"] = "audio-visual.pt"  # relative path to the trained model file
@@ -41,7 +41,7 @@ args["INDEX_TO_CHAR"] = {1: " ", 22: "'", 30: "1", 29: "0", 37: "3", 32: "2", 34
 
 # audio preprocessing
 args["NOISE_PROBABILITY"] = 0.25  # noise addition probability while training
-args["NOISE_SNR_DB"] = 0  # noise level in dB SNR
+args['NOISE_SNR_DB'] = 100  # noise level in dB SNR
 args["STFT_WINDOW"] = "hamming"  # window to use while computing STFT
 args["STFT_WIN_LENGTH"] = 0.040  # window size in secs for computing STFT
 args["STFT_OVERLAP"] = 0.030  # consecutive window overlap in secs while computing STFT
@@ -83,15 +83,15 @@ args["TX_FEEDFORWARD_DIM"] = 2048  # hidden layer size in feedforward network of
 args["TX_DROPOUT"] = 0.1  # dropout probability in the transformer
 
 # beam search
-args["BEAM_WIDTH"] = 100  # beam width
+args["BEAM_WIDTH"] = 10  # beam width
 args["LM_WEIGHT_ALPHA"] = 0.5  # weight of language model probability in shallow fusion beam scoring
 args["LENGTH_PENALTY_BETA"] = 0.1  # length penalty exponent hyperparameter
 args["THRESH_PROBABILITY"] = 0.0001  # threshold probability in beam search algorithm
-args["USE_LM"] = False  # whether to use language model for decoding
+args['USE_LM'] = 'False'  # whether to use language model for decoding
 
 # testing
-args["TEST_DEMO_DECODING"] = "greedy"  # test/demo decoding type - "greedy" or "search"
-args["TEST_DEMO_NOISY"] = False  # test/demo with noisy audio
+args['TEST_DEMO_DECODING'] = 'greedy'  # test/demo decoding type - "greedy" or "search"
+args['TEST_DEMO_NOISY'] = 'False'  # test/demo with noisy audio
 args["TEST_DEMO_MODE"] = "AV"  # mode to use AV model in - "AO" or "VO" or "AV"
 
 if __name__ == "__main__":

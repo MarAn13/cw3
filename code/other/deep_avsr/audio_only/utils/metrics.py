@@ -10,9 +10,7 @@ import numpy as np
 import editdistance
 
 
-
 def compute_cer(predictionBatch, targetBatch, predictionLenBatch, targetLenBatch):
-
     """
     Function to compute the Character Error Rate using the Predicted character indices and the Target character
     indices over a batch.
@@ -36,12 +34,10 @@ def compute_cer(predictionBatch, targetBatch, predictionLenBatch, targetLenBatch
         totalEdits = totalEdits + numEdits
         totalChars = totalChars + len(trgt)
 
-    return totalEdits/totalChars
-
+    return totalEdits / totalChars
 
 
 def compute_wer(predictionBatch, targetBatch, predictionLenBatch, targetLenBatch, spaceIx):
-
     """
     Function to compute the Word Error Rate using the Predicted character indices and the Target character
     indices over a batch. The words are obtained by splitting the output at spaces.
@@ -63,7 +59,8 @@ def compute_wer(predictionBatch, targetBatch, predictionLenBatch, targetLenBatch
         trgt = trgts[n].numpy()[:-1]
 
         predWords = np.split(pred, np.where(pred == spaceIx)[0])
-        predWords = [predWords[0].tostring()] + [predWords[i][1:].tostring() for i in range(1, len(predWords)) if len(predWords[i][1:]) != 0]
+        predWords = [predWords[0].tostring()] + [predWords[i][1:].tostring() for i in range(1, len(predWords)) if
+                                                 len(predWords[i][1:]) != 0]
 
         trgtWords = np.split(trgt, np.where(trgt == spaceIx)[0])
         trgtWords = [trgtWords[0].tostring()] + [trgtWords[i][1:].tostring() for i in range(1, len(trgtWords))]
@@ -72,4 +69,4 @@ def compute_wer(predictionBatch, targetBatch, predictionLenBatch, targetLenBatch
         totalEdits = totalEdits + numEdits
         totalWords = totalWords + len(trgtWords)
 
-    return totalEdits/totalWords
+    return totalEdits / totalWords

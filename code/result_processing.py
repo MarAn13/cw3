@@ -9,7 +9,7 @@ from PyQt5.QtCore import QTimer, QSize, QRectF, QObject, pyqtSignal, QRegExp
 from PyQt5.QtSvg import QSvgRenderer
 from ui_utils import resize_font
 from responsive_svg import ResponsiveIconButton
-from utils import predict, process_convert, compute_wer
+from utils import predict, process_convert, compute_wer, get_from_file, change_file
 import pandas as pd
 import openpyxl
 import docx
@@ -50,14 +50,15 @@ class LoadingScreen(QWidget):
 class ResultProcess(QObject):
     finished = pyqtSignal(dict, str)
 
-    def __init__(self, files, mode):
+    def __init__(self, files, mode, SNR):
         super().__init__()
         self.files = files
         self.mode = mode
+        self.SNR = SNR
 
     def process(self):
         # preprocess - dictionary {file: [filepath, filepath]}
-        preprocess = process_convert(self.files, self.mode)
+        preprocess = process_convert(self.files, self.mode, self.SNR)
         result = predict(preprocess, self.mode)
         print(result)
         # return {file: result}
@@ -86,11 +87,7 @@ class ResultWidget(QWidget):
         self.file_area_layout.addWidget(self.file_area_text, 0, 0, 1, 1)
         self.file_area_obj = []
         for i, (file, res) in enumerate(result.items()):
-            if file.split('.')[-1] in self.video_ext:
-                file_type = 'video'
-            else:
-                file_type = 'audio'
-            self.file_area_obj.append(FileIconResult(file, file_type, res, parent=self.file_area_widget))
+            self.file_area_obj.append(FileIconResult(file, res[0], res[1], parent=self.file_area_widget))
             temp = self.file_area_obj[-1]
             temp.setCursor(QCursor(Qt.PointingHandCursor))
             temp.clicked.connect(lambda _, arg=temp: self.show_result(arg))
@@ -133,11 +130,26 @@ class ResultWidget(QWidget):
         self.wer_input_area.setText(self.current_obj.getWER())
 
     def update_wer(self):
-        self.current_obj.setWER(self.wer_input_area.text().strip())
-        original_text = self.current_obj.getWER()
+        self.current_obj.setOriginal(self.wer_input_area.text().strip())
+        original_text = self.current_obj.getOriginal()
         pred_text = self.current_obj.getResult()
         if len(original_text) > 0 and len(pred_text) > 0:
-            wer = "{:.2f}".format(compute_wer(original_text, pred_text))
+            wer = compute_wer(original_text, pred_text)
+            data = get_from_file('data.txt', '')
+            mode = self.current_obj.getFiletype()
+            param_samples = mode[0].upper() + mode[1:] + ' samples'
+            param_WER = mode[0].upper() + mode[1:] + ' WER'
+            data[param_samples] = int(data[param_samples])
+            data[param_WER] = float(data[param_WER])
+            if self.current_obj.getWER() is not None:
+                data[param_samples] -= 1
+                data[param_WER] -= self.current_obj.getWER()
+            data[param_samples] += 1
+            data[param_WER] += wer
+            for param, param_val in [[param_samples, data[param_samples]], [param_WER, data[param_WER]]]:
+                change_file('data.txt', param, param_val)
+            self.current_obj.setWER(wer)
+            wer = "{:.2f}".format(wer)
         else:
             wer = '..'
         self.update_export()
@@ -176,7 +188,7 @@ class FileIconResult(QPushButton):
         self.aspect = (5, 1)  # width / height
         self.file = file
         self.filename = ''.join(file.split('\\')[-1])
-        self.wer_text = None
+        self.wer = None
         self.text_font = None
         self.filetype = filetype
         self.original = ''
@@ -195,6 +207,9 @@ class FileIconResult(QPushButton):
     def getFilename(self):
         return self.filename
 
+    def getFiletype(self):
+        return self.filetype
+
     def getOriginal(self):
         return self.original
 
@@ -205,10 +220,10 @@ class FileIconResult(QPushButton):
         return self.result
 
     def getWER(self):
-        return self.wer_text
+        return self.wer
 
-    def setWER(self, wer_text):
-        self.wer_text = wer_text
+    def setWER(self, wer):
+        self.wer = wer
 
     def setFont(self, font):
         self.text_font = font
@@ -232,7 +247,7 @@ class FileIconResult(QPushButton):
         path = QPainterPath()
         path.addRoundedRect(0, 0, self.width(), self.height(), 15, 15)
         painter.fillPath(path, QColor('#454545'))
-        if self.filetype == 'video':
+        if self.filetype != 'audio-only':
             svg = QSvgRenderer('../assets/video_file_icon.svg')
         else:
             svg = QSvgRenderer('../assets/audio_file_icon.svg')

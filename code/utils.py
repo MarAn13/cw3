@@ -427,7 +427,7 @@ def get_from_file(file, param):
     return result
 
 
-def change_file(file, param, param_val=None):
+def change_file(file, param, param_val):
     """
     changes the value of the specified parameter in the provided file to the desired
     :param file (str): filepath
@@ -508,9 +508,6 @@ def main():
 
 
 if __name__ == '__main__':
-    print(change_file('config.txt', 'Resolution', '1024x120'))
-    print(change_file('config.txt', 'Decoder', 'search'))
-    print(change_file('config.txt', 'Audio SNR', '0'))
-    print(change_file('config.txt', 'Video SNR', '10'))
-    print(change_file('config.txt', 'Vide SNR', '10'))
+    print(change_config_file('audio-only', 'NOISE_SNR_DB', 10))
+    print(change_config_file('audio-only', 'NOISE_SNR_DB', 20))
     print('done')

@@ -14,7 +14,7 @@ class SvgWidgetAspect(QSvgWidget):
         super().__init__(parent=parent)
         self.aspect_ratio = aspect_ratio
         self.clickable = clickable
-        self.click_event = None
+        self.click_event = []
         self.load(filepath)
 
     def resizeEvent(self, e):
@@ -31,11 +31,12 @@ class SvgWidgetAspect(QSvgWidget):
 
     def connect(self, func):
         if self.clickable:
-            self.click_event = func
+            self.click_event.append(func)
 
     def mousePressEvent(self, e):
         if self.clickable and self.click_event:
-            self.click_event()
+            for func in self.click_event:
+                func()
 
 
 class CustomAudioSvgWidget(SvgWidgetAspect):

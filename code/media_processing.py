@@ -10,7 +10,7 @@ from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 import pyqtgraph as pg
 from ui_utils import ms_to_time, resize_font, clear_widget
-from utils import check_streams
+from utils import check_streams, get_from_file, change_config_file, change_file
 from responsive_svg import SvgWidgetAspect, ResponsiveIconButton
 from result_processing import ResultWidget, ResultProcess, LoadingScreen
 import os
@@ -351,7 +351,6 @@ class ProcessWidget(QWidget):
 
     def render_record_widget(self):
         parent = self.parent().parent()
-        clear_widget(self.parent())
         record_widget = parent.render_record(self.file_type)
         if self.file_type == 'video':
             record_widget.render_record_video()
@@ -364,6 +363,7 @@ class ProcessWidget(QWidget):
             parent.screen_widgets['file_upload_widget'].setVisible(False)
         self.setVisible(False)
         parent.render_loading_screen()
+        config = get_from_file('config.txt', '')
         if self.file_type != 'audio':
             if self.radio_button_preferred.isChecked():
                 raw_files = [[self.audio_only, 'audio-only'], [self.video_only, 'video-only'],
@@ -385,10 +385,16 @@ class ProcessWidget(QWidget):
             self.result['video-only'] = []
             self.result['audio-video'] = []
         for files, mode in raw_files:
-            print(files, mode)
             if len(files) > 0:
+                data = get_from_file('data.txt', '')
+                param = mode[0].upper() + mode[1:] + ' used'
+                change_file('data.txt', param, int(data[param]) + len(files))
+                for param, param_val in [['TEST_DEMO_DECODING', config['Decoder']],
+                                         ['TEST_DEMO_NOISY', config['Use noise']],
+                                         ['USE_LM', config['Use LM']], ['NOISE_SNR_DB', int(config['Audio SNR'])]]:
+                    change_config_file(mode, param, param_val)
                 thread = parent.create_thread()
-                worker = ResultProcess(files, mode)
+                worker = ResultProcess(files, mode, int(config['Video SNR']))
                 worker.moveToThread(thread)
                 thread.started.connect(worker.process)
                 worker.finished.connect(self.process_result)
@@ -399,14 +405,15 @@ class ProcessWidget(QWidget):
                 self.result[mode] = []
 
     def process_result(self, result, mode):
-        print('process_result')
         self.result[mode] = result
         if self.result['audio-only'] is not None and self.result['video-only'] is not None and self.result[
             'audio-video'] is not None:
             result = dict()
-            for i, j in self.result.items():
-                result.update(j)
-            clear_widget(self.parent())
+            for mode, res in self.result.items():
+                if len(res) != 0:
+                    for key, val in res.items():
+                        res[key] = [mode, val]
+                result.update(res)
             self.parent().parent().render_result_process(result)
 
     def resizeEvent(self, e):

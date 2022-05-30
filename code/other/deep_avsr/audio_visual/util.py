@@ -2,7 +2,8 @@ import torch
 import numpy as np
 import os
 
-from .config import args
+from scipy.io import wavfile
+
 from .models.av_net import AVNet
 from .models.lrs2_char_lm import LRS2CharLM
 from .models.visual_frontend import VisualFrontend
@@ -16,34 +17,38 @@ from argparse import ArgumentParser
 
 def predict(files):
     # files {file: [filepath, filepath]}
+    from importlib import reload
+    from . import config
+    reload(config)
+    print('av lm decoder noise db: ', config.args["TEST_DEMO_MODE"], config.args["USE_LM"], config.args["TEST_DEMO_DECODING"], config.args["TEST_DEMO_NOISY"], config.args["NOISE_SNR_DB"])
     result = dict()
-    np.random.seed(args["SEED"])
-    torch.manual_seed(args["SEED"])
+    np.random.seed(config.args["SEED"])
+    torch.manual_seed(config.args["SEED"])
     gpuAvailable = torch.cuda.is_available()
     device = torch.device("cuda" if gpuAvailable else "cpu")
 
-    if args["TRAINED_MODEL_FILE"] is not None:
+    if config.args["TRAINED_MODEL_FILE"] is not None:
         # declaring the model and loading the trained weights
-        model = AVNet(args["TX_NUM_FEATURES"], args["TX_ATTENTION_HEADS"], args["TX_NUM_LAYERS"], args["PE_MAX_LENGTH"],
-                      args["AUDIO_FEATURE_SIZE"], args["TX_FEEDFORWARD_DIM"], args["TX_DROPOUT"], args["NUM_CLASSES"])
-        model.load_state_dict(torch.load(args["CODE_DIRECTORY"] + args["TRAINED_MODEL_FILE"], map_location=device))
+        model = AVNet(config.args["TX_NUM_FEATURES"], config.args["TX_ATTENTION_HEADS"], config.args["TX_NUM_LAYERS"], config.args["PE_MAX_LENGTH"],
+                      config.args["AUDIO_FEATURE_SIZE"], config.args["TX_FEEDFORWARD_DIM"], config.args["TX_DROPOUT"], config.args["NUM_CLASSES"])
+        model.load_state_dict(torch.load(config.args["CODE_DIRECTORY"] + config.args["TRAINED_MODEL_FILE"], map_location=device))
         model.to(device)
 
         # declaring the visual frontend module
         vf = VisualFrontend()
-        vf.load_state_dict(torch.load(args["TRAINED_FRONTEND_FILE"], map_location=device))
+        vf.load_state_dict(torch.load(config.args["TRAINED_FRONTEND_FILE"], map_location=device))
         vf.to(device)
 
         # declaring the language model
         lm = LRS2CharLM()
-        lm.load_state_dict(torch.load(args["TRAINED_LM_FILE"], map_location=device))
+        lm.load_state_dict(torch.load(config.args["TRAINED_LM_FILE"], map_location=device))
         lm.to(device)
-        if not args["USE_LM"]:
+        if not config.args["USE_LM"]:
             lm = None
 
         # reading the noise file
-        if args["TEST_DEMO_NOISY"]:
-            _, noise = wavfile.read(args["DATA_DIRECTORY"] + "/noise.wav")
+        if config.args["TEST_DEMO_NOISY"]:
+            _, noise = wavfile.read(config.args["DATA_DIRECTORY"] + '\\' + "noise.wav")
         else:
             noise = None
 
@@ -52,33 +57,33 @@ def predict(files):
             result[filepath] = ''
             for file in file_chunks:
                 if file.endswith(".mp4"):
-                    file_output = args['PRED_OUTPUT'] + 'temp'
+                    file_output = config.args['PRED_OUTPUT'] + 'temp'
 
                     # preprocessing the sample
-                    params = {"roiSize": args["ROI_SIZE"], "normMean": args["NORMALIZATION_MEAN"],
-                              "normStd": args["NORMALIZATION_STD"], "vf": vf}
+                    params = {"roiSize": config.args["ROI_SIZE"], "normMean": config.args["NORMALIZATION_MEAN"],
+                              "normStd": config.args["NORMALIZATION_STD"], "vf": vf}
                     preprocess_sample(file, file_output, params)
 
                     # converting the data sample into appropriate tensors for input to the model
                     audioFile = file_output + ".wav"
                     visualFeaturesFile = file_output + ".npy"
-                    audioParams = {"stftWindow": args["STFT_WINDOW"], "stftWinLen": args["STFT_WIN_LENGTH"],
-                                   "stftOverlap": args["STFT_OVERLAP"]}
-                    videoParams = {"videoFPS": args["VIDEO_FPS"]}
+                    audioParams = {"stftWindow": config.args["STFT_WINDOW"], "stftWinLen": config.args["STFT_WIN_LENGTH"],
+                                   "stftOverlap": config.args["STFT_OVERLAP"]}
+                    videoParams = {"videoFPS": config.args["VIDEO_FPS"]}
                     inp, _, inpLen, _ = prepare_main_input(audioFile, visualFeaturesFile, None, noise,
-                                                           args["MAIN_REQ_INPUT_LENGTH"],
-                                                           args["CHAR_TO_INDEX"], args["NOISE_SNR_DB"], audioParams,
+                                                           config.args["MAIN_REQ_INPUT_LENGTH"],
+                                                           config.args["CHAR_TO_INDEX"], config.args["NOISE_SNR_DB"], audioParams,
                                                            videoParams)
                     inputBatch, _, inputLenBatch, _ = collate_fn([(inp, None, inpLen, None)])
 
                     # running the model
                     inputBatch = ((inputBatch[0].float()).to(device), (inputBatch[1].float()).to(device))
                     inputLenBatch = (inputLenBatch.int()).to(device)
-                    if args["TEST_DEMO_MODE"] == "AO":
+                    if config.args["TEST_DEMO_MODE"] == "AO":
                         inputBatch = (inputBatch[0], None)
-                    elif args["TEST_DEMO_MODE"] == "VO":
+                    elif config.args["TEST_DEMO_MODE"] == "VO":
                         inputBatch = (None, inputBatch[1])
-                    elif args["TEST_DEMO_MODE"] == "AV":
+                    elif config.args["TEST_DEMO_MODE"] == "AV":
                         pass
                     else:
                         exit()
@@ -88,24 +93,24 @@ def predict(files):
                         outputBatch = model(inputBatch)
 
                     # obtaining the prediction using CTC deocder
-                    if args["TEST_DEMO_DECODING"] == "greedy":
+                    if config.args["TEST_DEMO_DECODING"] == "greedy":
                         predictionBatch, predictionLenBatch = ctc_greedy_decode(outputBatch, inputLenBatch,
-                                                                                args["CHAR_TO_INDEX"]["<EOS>"])
+                                                                                config.args["CHAR_TO_INDEX"]["<EOS>"])
 
-                    elif args["TEST_DEMO_DECODING"] == "search":
-                        beamSearchParams = {"beamWidth": args["BEAM_WIDTH"], "alpha": args["LM_WEIGHT_ALPHA"],
-                                            "beta": args["LENGTH_PENALTY_BETA"],
-                                            "threshProb": args["THRESH_PROBABILITY"]}
+                    elif config.args["TEST_DEMO_DECODING"] == "search":
+                        beamSearchParams = {"beamWidth": config.args["BEAM_WIDTH"], "alpha": config.args["LM_WEIGHT_ALPHA"],
+                                            "beta": config.args["LENGTH_PENALTY_BETA"],
+                                            "threshProb": config.args["THRESH_PROBABILITY"]}
                         predictionBatch, predictionLenBatch = ctc_search_decode(outputBatch, inputLenBatch,
                                                                                 beamSearchParams,
-                                                                                args["CHAR_TO_INDEX"][" "],
-                                                                                args["CHAR_TO_INDEX"]["<EOS>"], lm)
+                                                                                config.args["CHAR_TO_INDEX"][" "],
+                                                                                config.args["CHAR_TO_INDEX"]["<EOS>"], lm)
                     else:
                         exit()
 
                     # converting character indices back to characters
                     pred = predictionBatch[:][:-1]
-                    pred = "".join([args["INDEX_TO_CHAR"][ix] for ix in pred.tolist()])
+                    pred = "".join([config.args["INDEX_TO_CHAR"][ix] for ix in pred.tolist()])
 
                     if result[filepath] != '':
                         result[filepath] += ' '

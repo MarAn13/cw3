@@ -1,0 +1,6 @@
+Resolution : 1440 x 1024
+Decoder : greedy
+Use LM : False
+Use noise : False
+Audio SNR : 100
+Video SNR : 100

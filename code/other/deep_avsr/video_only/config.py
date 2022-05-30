@@ -12,7 +12,7 @@ current_dir = str(pathlib.Path(__file__).parent.resolve())
 # project structure
 args["CODE_DIRECTORY"] = current_dir + '\\final\\models\\'  # absolute path to the code directory
 args['PRED_OUTPUT'] = '\\'.join(current_dir.split('\\')[0:-3]) + '\\temp\\'
-args["DATA_DIRECTORY"] = None  # absolute path to the data directory
+args["DATA_DIRECTORY"] = '\\'.join(current_dir.split('\\')[0:-3]) + '\\data'  # absolute path to the data directory
 args["DEMO_DIRECTORY"] = None  # "C:/Users/marem/PycharmProjects/home/projects/cw3/app/code/other/demo/video-only/"  # absolute path to the demo directory
 args["PRETRAINED_MODEL_FILE"] = "video-only.pt"  # relative path to the pretrained model file
 args["TRAINED_MODEL_FILE"] = "video-only.pt"  # relative path to the trained model file
@@ -73,7 +73,7 @@ args["TX_FEEDFORWARD_DIM"] = 2048  # hidden layer size in feedforward network of
 args["TX_DROPOUT"] = 0.1  # dropout probability in the transformer
 
 # beam search
-args["BEAM_WIDTH"] = 100  # beam width
+args["BEAM_WIDTH"] = 10  # beam width
 args["LM_WEIGHT_ALPHA"] = 0.5  # weight of language model probability in shallow fusion beam scoring
 args["LENGTH_PENALTY_BETA"] = 0.1  # length penalty exponent hyperparameter
 args["THRESH_PROBABILITY"] = 0.0001  # threshold probability in beam search algorithm
