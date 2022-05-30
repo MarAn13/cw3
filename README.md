@@ -13,7 +13,7 @@
     python-docx
     pyaudio
     pydub
-
+    pyqtgraph
 ## Neural network setup guide
 ### forked from https://github.com/lordmartian/deep_avsr
     place pre-trained weights of AO, VO, AV models in 'code/other/deep_avsr/../final/models' directory for the corresponding NN model
